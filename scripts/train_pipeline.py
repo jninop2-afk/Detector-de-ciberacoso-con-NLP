@@ -13,15 +13,26 @@ from sklearn.metrics import accuracy_score, classification_report
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from app.nlp.preprocessor import preprocesar_texto
 
+URL_OFICIAL = "https://huggingface.co/datasets/FelipeGuerra/Colombian_Spanish_Cyberbullying_Dataset_1/resolve/main/DATASET_FINAL.csv"
+RUTA_LOCAL = os.path.join("data", "raw", "colombian_cyberbullying.csv")
+
 def ejecutar_pipeline():
-    print("1. Descargando Dataset de Ciberacoso Colombiano desde Hugging Face...")
-    url_dataset = "https://huggingface.co/datasets/FelipeGuerra/Colombian_Spanish_Cyberbullying_Dataset_1/resolve/main/DATASET_FINAL.csv"
+    print("\n--- ENTRENAMIENTO DEL MODELO ---")
     
-    try:
-        df = pd.read_csv(url_dataset)
-    except Exception as e:
-        print(f"Error al leer el dataset remoto: {e}")
-        return
+    # Cargar datos desde el almacenamiento local o la fuente oficial
+    if os.path.exists(RUTA_LOCAL):
+        print("1. Cargando dataset oficial desde copia local...")
+        df = pd.read_csv(RUTA_LOCAL)
+    else:
+        print("1. Descargando dataset oficial desde Hugging Face...")
+        try:
+            df = pd.read_csv(URL_OFICIAL)
+            os.makedirs(os.path.join("data", "raw"), exist_ok=True)
+            df.to_csv(RUTA_LOCAL, index=False)
+            print("Copia local guardada exitosamente.")
+        except Exception as e:
+            print(f"Error al descargar el dataset oficial: {e}")
+            return
 
     col_texto = next((col for col in ['texto', 'text', 'comment', 'mensaje'] if col in df.columns), df.columns[0])
     col_etiqueta = next((col for col in ['categoria', 'label', 'etiqueta', 'target', 'class'] if col in df.columns), df.columns[1])
@@ -30,17 +41,17 @@ def ejecutar_pipeline():
     df = df.dropna(subset=[col_texto, col_etiqueta])
     df = df[df[col_texto].astype(str).str.strip() != ""]
 
-    print("\n2. Aplicando limpieza NLP (Issues #2 y #3)...")
+    print("\n2. Aplicando limpieza NLP con soporte Leetspeak (Issues #2 y #3)...")
     df['texto_limpio'] = df[col_texto].astype(str).apply(preprocesar_texto)
     df = df[df['texto_limpio'].str.strip() != ""]
 
-    # Filtrar clases con menos de 2 registros
+    # Filtrar clases con menos de 2 registros para permitir estratificación
     conteo_clases = df[col_etiqueta].value_counts()
     clases_validas = conteo_clases[conteo_clases >= 2].index
     df = df[df[col_etiqueta].isin(clases_validas)]
 
     print("\n3. Vectorizando con TF-IDF (Issue #4)...")
-    vectorizador = TfidfVectorizer(max_features=5000)
+    vectorizador = TfidfVectorizer(max_features=10000, ngram_range=(1, 2))
     X = vectorizador.fit_transform(df['texto_limpio'])
     y = df[col_etiqueta]
 
@@ -53,7 +64,12 @@ def ejecutar_pipeline():
     modelos = {
         "Árbol de Decisión (J48)": DecisionTreeClassifier(random_state=42),
         "Naive Bayes": MultinomialNB(),
-        "SVM (Support Vector Machine)": SVC(kernel='linear', probability=True, random_state=42)
+        "SVM (Support Vector Machine)": SVC(
+            kernel='linear', 
+            probability=True,  
+            class_weight='balanced', 
+            random_state=42
+        )
     }
 
     mejor_modelo = None
@@ -79,7 +95,7 @@ def ejecutar_pipeline():
     os.makedirs("models", exist_ok=True)
     joblib.dump(vectorizador, os.path.join("models", "vectorizer.pkl"))
     joblib.dump(mejor_modelo, os.path.join("models", "best_model.pkl"))
-    print("Modelos guardados con éxito en: 'models/vectorizer.pkl' y 'models/best_model.pkl'.")
+    print(" Modelos guardados con éxito en: 'models/vectorizer.pkl' y 'models/best_model.pkl'.")
 
 if __name__ == "__main__":
     ejecutar_pipeline()

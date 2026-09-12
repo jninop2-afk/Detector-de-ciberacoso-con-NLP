@@ -1,38 +1,39 @@
 import re
 import unicodedata
 
+def decodificar_leetspeak(texto: str) -> str:
+    """Traduce números usados como letras al alfabeto estándar."""
+    mapa_leet = {
+        '0': 'o',
+        '1': 'i',
+        '3': 'e',
+        '4': 'a',
+        '5': 's',
+        '7': 't'
+    }
+    for num, letra in mapa_leet.items():
+        texto = texto.replace(num, letra)
+    return texto
 
-#Función para quitar acentos del texto. Se llama en prepocesar_texto
-def quitar_acentos(texto: str) -> str:
-    """Normaliza y elimina los acentos de la cadena de texto."""
-    nfkd = unicodedata.normalize('NFKD', texto)
-    return "".join([c for c in nfkd if not unicodedata.combining(c)])
-
-
-
-#Función para procesar texto.
 def preprocesar_texto(texto: str) -> str:
-    """
-    Limpia y normaliza un mensaje para el pipeline de NLP.
-    Cumple con los Issues #2 y #3.
-    """
-    if not texto or not isinstance(texto, str):
+    """Limpia y estandariza el texto para el modelo NLP."""
+    if not isinstance(texto, str):
         return ""
-
+    
     # 1. Convertir a minúsculas
     texto = texto.lower()
-
-    # 2. Eliminar URLs
-    texto = re.sub(r'https?://\S+|www\.\S+', '', texto)
-
-    # 3. Eliminar acentos
-    texto = quitar_acentos(texto)
-
-    # 4. Eliminar caracteres especiales y números (mantiene solo letras y espacios)
+    
+    # 2. Decodificar leetspeak (Ej: p3rr4 -> perra)
+    texto = decodificar_leetspeak(texto)
+    
+    # 3. Quitar acentos 
+    texto = ''.join(c for c in unicodedata.normalize('NFD', texto) if unicodedata.category(c) != 'Mn')
+    
+    # 4. Eliminar caracteres especiales, puntuación y URLs
+    texto = re.sub(r'http\S+|www\S+|https\S+', '', texto, flags=re.MULTILINE)
     texto = re.sub(r'[^a-z\s]', '', texto)
-
-    # 5. Tokenización simple y eliminación de espacios extra
-    tokens = texto.split()
-
-    # Retorna el texto limpio reunificado (listo para TF-IDF)
-    return " ".join(tokens)
+    
+    # 5. Eliminar espacios extra
+    texto = re.sub(r'\s+', ' ', texto).strip()
+    
+    return texto
