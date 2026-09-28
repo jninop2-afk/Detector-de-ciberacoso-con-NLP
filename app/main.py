@@ -4,11 +4,16 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app.services.predictor import predecir_ciberacoso
-from scripts.train_pipeline import ejecutar_pipeline
+from scripts.train_pipeline import ejecutar_pipeline, actualizar_dataset_maestro
+
 
 def cargarDatasetet():
-    print("\n\t == MÓDULO DE ENTRENAMIENTO ==")
+    print("\n\t == MÓDULO DE ENTRENAMIENTO Y ACTUALIZACIÓN ==")
+    # 1. Homologa y fusiona los nuevos CSVs en el dataset maestro
+    actualizar_dataset_maestro()
+    # 2. Reentrena el modelo con los datos unificados
     ejecutar_pipeline()
+
 
 def prueba_por_consola():
     print("\n\t---- BIENVENIDO PRUEBA DE DETECCIÓN DE CIBERACOSO (NLP) ----")
@@ -33,7 +38,27 @@ def prueba_por_consola():
             print(f"Error en la predicción (¿Ya entrenaste el modelo?): {e}")
 
 
+def mostrar_menu():
+    while True:
+        print("\n==================================================")
+        print("   SISTEMA DE DETECCIÓN DE CIBERACOSO (COLOMBIA)  ")
+        print("==================================================")
+        print("1. Actualizar Datasets y Reentrenar Modelo")
+        print("2. Ir a Prueba por Consola")
+        print("3. Salir")
+        
+        opcion = input("\nSeleccione una opción (1-3): ").strip()
+        
+        if opcion == "1":
+            cargarDatasetet()
+        elif opcion == "2":
+            prueba_por_consola()
+        elif opcion == "3":
+            print("Saliendo del programa...")
+            break
+        else:
+            print("Opción no válida. Intente nuevamente.")
+
 
 if __name__ == "__main__":
-    ejecutar_pipeline()
-    prueba_por_consola()
+    mostrar_menu()
