@@ -1,7 +1,8 @@
-venv/[cite: 2]
-.venv/[cite: 2]
-env/[cite: 2]
-__pycache__/[cite: 2]
-*.py[cod][cite: 2]
-.env[cite: 2]
-.vscode/[cite: 2]
+venv/
+.venv/
+env/
+__pycache__/
+*.py[cod]
+.env
+.vscode/
+data/vigilancia_bluesky.json
