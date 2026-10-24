@@ -1,86 +1,143 @@
+"""Componentes de interfaz: revisión de mensajes dudosos por administradores.
+
+Los botones son DynamicItem: su custom_id incluye el id de la revisión
+guardada en SQLite, así siguen funcionando aunque el bot se reinicie.
+"""
+
 import discord
-from src.database import save_admin_feedback
-from src.feedback import save_admin_correction
+
+from src import config
+from src import database as db
+from src.bot_Discord.moderation import apply_infraction, truncate
+
+BUTTON_STYLES = {
+    0: discord.ButtonStyle.success,
+    1: discord.ButtonStyle.danger,
+    2: discord.ButtonStyle.primary,
+    3: discord.ButtonStyle.danger,
+    4: discord.ButtonStyle.primary,
+}
 
 
-class CategorizationView(discord.ui.View):
+class ReviewButton(
+    discord.ui.DynamicItem[discord.ui.Button],
+    template=r'review:(?P<review_id>[0-9]+):(?P<category>[0-4])',
+):
 
-  def __init__(self, target_user_id: int, message_content: str):
-    super().__init__(timeout=None)  # Los botones persisten
-    self.target_user_id = target_user_id
-    self.message_content = message_content
-
-  async def process_category(
-      self, interaction: discord.Interaction, category: int, label: str
-  ):
-    # Determine binary classification (0 if category 0, 1 otherwise)
-    es_acoso = 0 if category == 0 else 1
-
-    # 1. Save in SQLite
-    save_admin_feedback(self.target_user_id, self.message_content, category)
-
-    # 2. Save in dataset CSV for re-training
-    save_admin_correction(
-        texto=self.message_content, es_ciberacoso=es_acoso, categoria=category
+  def __init__(self, review_id: int, category: int):
+    super().__init__(
+        discord.ui.Button(
+            label=f'{category}: {config.CATEGORY_SHORT[category]}',
+            style=BUTTON_STYLES[category],
+            custom_id=f'review:{review_id}:{category}',
+        )
     )
+    self.review_id = review_id
+    self.category = category
 
-    # Deshabilitar botones tras responder
-    for child in self.children:
-      child.disabled = True
+  @classmethod
+  async def from_custom_id(cls, interaction, item, match):
+    return cls(int(match['review_id']), int(match['category']))
 
-    await interaction.response.edit_message(
-        content=(
-            f" **Mensaje Categorizado por {interaction.user.mention}**\n"
-            f'Texto: "{self.message_content}"\n'
-            f"Categoría asignada: **{label}** (Guardado para reentrenamiento)."
+  async def interaction_check(self, interaction: discord.Interaction) -> bool:
+    perms = getattr(interaction.user, 'guild_permissions', None)
+    if perms is None or not perms.manage_messages:
+      await interaction.response.send_message(
+          'Sólo moderadores pueden clasificar mensajes.', ephemeral=True
+      )
+      return False
+    return True
+
+  async def callback(self, interaction: discord.Interaction):
+    review = db.get_review(self.review_id)
+    if review is None:
+      await interaction.response.send_message('La revisión no existe.', ephemeral=True)
+      return
+    if not db.resolve_review(self.review_id, self.category, interaction.user.id):
+      await interaction.response.send_message(
+          'Otro moderador ya clasificó este mensaje.', ephemeral=True
+      )
+      return
+
+    embed = interaction.message.embeds[0] if interaction.message.embeds else discord.Embed()
+    embed.color = discord.Color.green() if self.category == 0 else discord.Color.red()
+    embed.add_field(
+        name='Resolución',
+        value=(
+            f'{interaction.user.mention} → **{config.CATEGORIES[self.category]}**'
+            ' (guardado para reentrenamiento)'
         ),
-        view=self,
+        inline=False,
+    )
+    await interaction.response.edit_message(embed=embed, view=None)
+
+    if self.category == 0:
+      return
+
+    # Confirmado como ciberacoso: borrar el mensaje original y sancionar
+    guild = interaction.guild
+    channel = guild.get_channel(review['channel_id'])
+    if channel is not None:
+      try:
+        original = await channel.fetch_message(review['message_id'])
+        await original.delete()
+      except (discord.NotFound, discord.Forbidden):
+        pass
+
+    member = guild.get_member(review['user_id'])
+    if member is None:
+      try:
+        member = await guild.fetch_member(review['user_id'])
+      except discord.NotFound:
+        await interaction.followup.send('El usuario ya no está en el servidor.', ephemeral=True)
+        return
+
+    _, _, sanction = await apply_infraction(
+        member, channel or interaction.channel, review['message_text'],
+        self.category, interaction.channel,
+    )
+    await interaction.followup.send(
+        f'Alerta registrada a {member.mention}'
+        + (f' (sanción: {sanction}).' if sanction else '.'),
+        ephemeral=True,
     )
 
-  @discord.ui.button(
-      label="0: Seguro", style=discord.ButtonStyle.secondary, custom_id="cat_0"
-  )
-  async def cat_0_button(
-      self, interaction: discord.Interaction, button: discord.ui.Button
-  ):
-    await self.process_category(interaction, 0, "0 - Seguro")
 
-  @discord.ui.button(
-      label="1: Amenaza", style=discord.ButtonStyle.danger, custom_id="cat_1"
+def build_review_view(review_id: int) -> discord.ui.View:
+  view = discord.ui.View(timeout=None)
+  for category in range(5):
+    view.add_item(ReviewButton(review_id, category))
+  return view
+
+
+def build_review_embed(message: discord.Message, result: dict) -> discord.Embed:
+  embed = discord.Embed(
+      title='Revisión requerida: mensaje dudoso',
+      description=f'[Ir al mensaje]({message.jump_url}) en {message.channel.mention}',
+      color=discord.Color.gold(),
   )
-  async def cat_1_button(
-      self, interaction: discord.Interaction, button: discord.ui.Button
-  ):
-    await self.process_category(
-        interaction, 1, "1 - Hostigamiento/Amenaza Directa"
+  embed.add_field(
+      name='Usuario', value=f'{message.author.mention} (`{message.author.id}`)', inline=False
+  )
+  embed.add_field(name='Contenido', value=f'"{truncate(message.content)}"', inline=False)
+  embed.add_field(
+      name='Predicción',
+      value=f'{config.CATEGORIES[result["categoria"]]} ({result["confianza"] * 100:.1f}%)',
+      inline=True,
+  )
+  embed.add_field(name='Motor', value=result['motor'], inline=True)
+  probs = []
+  if result['prob_clasico'] is not None:
+    probs.append(f'clásico {result["prob_clasico"]:.2f}')
+  if result['prob_roberta'] is not None:
+    probs.append(f'RoBERTa {result["prob_roberta"]:.2f}')
+  if probs:
+    embed.add_field(name='P(ciberacoso)', value=' | '.join(probs), inline=True)
+  if result['motivos_sospecha']:
+    embed.add_field(
+        name='Motivos de sospecha',
+        value=truncate('\n'.join(f'• {r}' for r in result['motivos_sospecha'])),
+        inline=False,
     )
-
-  @discord.ui.button(
-      label="2: Insulto", style=discord.ButtonStyle.primary, custom_id="cat_2"
-  )
-  async def cat_2_button(
-      self, interaction: discord.Interaction, button: discord.ui.Button
-  ):
-    await self.process_category(interaction, 2, "2 - Insulto/Ofensa Personal")
-
-  @discord.ui.button(
-      label="3: Odio/Muerte",
-      style=discord.ButtonStyle.danger,
-      custom_id="cat_3",
-  )
-  async def cat_3_button(
-      self, interaction: discord.Interaction, button: discord.ui.Button
-  ):
-    await self.process_category(
-        interaction, 3, "3 - Incitación al Odio/Muerte"
-    )
-
-  @discord.ui.button(
-      label="4: Calumnia", style=discord.ButtonStyle.primary, custom_id="cat_4"
-  )
-  async def cat_4_button(
-      self, interaction: discord.Interaction, button: discord.ui.Button
-  ):
-    await self.process_category(
-        interaction, 4, "4 - Difamación/Calumnia Política"
-    )
+  embed.set_footer(text='Selecciona la categoría correcta. Se usará para reentrenar el modelo.')
+  return embed

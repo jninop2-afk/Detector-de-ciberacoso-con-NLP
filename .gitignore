@@ -1,8 +1,53 @@
+
+# Archivos de Entorno y Claves Secretas
+
 .env
-venv/[cite: 2]
-.venv/[cite: 2]
-env/[cite: 2]
-__pycache__/[cite: 2]
-*.py[cod][cite: 2]
-.env[cite: 2]
-.vscode/[cite: 2]
+*.env
+.env.local
+
+
+# Entornos Virtuales de Python
+
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+
+# Archivos de Caché de Python
+
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+
+# Base de Datos y Persistencia Local
+
+*.db
+*.sqlite3
+data/bot_database.db
+
+
+# Modelos Entrenados y Datasets Pesados
+
+models/*.pkl
+models/*.joblib
+
+# Datos de retroalimentación acumulados localmente
+data/raw/feedback_admin.csv
+data/processed/*.csv
+
+
+# Configuración de IDE y Sistema Operativo
+
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+# Modelo RoBERTa afinado (pesa ~500 MB)
+models/roberta_finetuned/
+data/processed/label_review.csv
+models/pretrained/
