@@ -22,7 +22,33 @@ LEGACY_FEEDBACK_CSV = RAW_DIR / 'feedback_admin.csv'
 LABEL_CORRECTIONS_CSV = RAW_DIR / 'label_corrections.csv'
 LABEL_REVIEW_CSV = PROCESSED_DIR / 'label_review.csv'
 
+# Datasets en inglés (Twitter racismo/sexismo y YouTube). Se traducen una sola
+# vez con "python main.py traducir" y se cachean en data/processed/.
+ENGLISH_DATASETS = [
+    {'file': RAW_DIR / 'twitter_racism_parsed_dataset.csv',
+     'col_text': 'Text', 'col_label': 'oh_label', 'col_annot': 'Annotation'},
+    {'file': RAW_DIR / 'twitter_sexism_parsed_dataset.csv',
+     'col_text': 'Text', 'col_label': 'oh_label', 'col_annot': 'Annotation'},
+    {'file': RAW_DIR / 'youtube_parsed_dataset.csv',
+     'col_text': 'Text', 'col_label': 'oh_label', 'col_annot': None},
+]
+ENGLISH_TRANSLATED_CSV = PROCESSED_DIR / 'ingles_traducido.csv'
+
 DB_PATH = DATA_DIR / 'bot_database.db'
+
+# --- Bluesky ---
+BLUESKY_HANDLE = os.getenv('BLUESKY_HANDLE')
+BLUESKY_APP_PASSWORD = os.getenv('BLUESKY_APP_PASSWORD')
+# Por defecto los reportes son simulados; BLUESKY_REPORTES_REALES=1 los envía
+BLUESKY_REPORTES_REALES = os.getenv('BLUESKY_REPORTES_REALES') == '1'
+BLUESKY_UMBRAL_REPORTE = float(os.getenv('BLUESKY_UMBRAL_REPORTE', '0.60'))
+BLUESKY_INTERVALO = int(os.getenv('BLUESKY_INTERVALO', '15'))
+BLUESKY_CUENTAS_VIGILADAS = [
+    c.strip().lstrip('@')
+    for c in os.getenv('BLUESKY_CUENTAS_VIGILADAS', '').split(',')
+    if c.strip()
+]
+BLUESKY_VIGILANCIA_JSON = DATA_DIR / 'vigilancia_bluesky.json'
 
 # Artefactos de modelos
 CLASSIC_MODEL_PATH = MODELS_DIR / 'classic_model.joblib'

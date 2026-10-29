@@ -1,10 +1,13 @@
 discord.py>=2.4.0
+atproto>=0.0.55
 python-dotenv>=1.0.0
 pandas>=2.0.0
 numpy>=1.24.0
 scikit-learn>=1.3.0
 joblib>=1.3.0
 emoji>=2.10.0
+# Traducción de los datasets en inglés (python main.py traducir)
+deep-translator>=1.11.4
 # RoBERTa (para CPU: pip install torch --index-url https://download.pytorch.org/whl/cpu)
 torch>=2.2.0
 transformers>=4.40.0

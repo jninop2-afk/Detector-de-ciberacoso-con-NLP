@@ -13,6 +13,7 @@ from src.preprocessing import clean_text
 
 # Prioridad al deduplicar: a igual texto gana la fuente con mayor valor
 SOURCE_PRIORITY = {
+    'ingles': -1,
     'corpus': 0,
     'colombia': 1,
     'refuerzo': 2,
@@ -57,6 +58,19 @@ def load_corpus(n_negatives: int | None = 6000) -> pd.DataFrame:
   out = pd.concat([positives, negatives], ignore_index=True)
   out['categoria'] = pd.NA
   return out[['texto', 'ciberacoso', 'categoria']].assign(fuente='corpus')
+
+
+def load_english_translated() -> pd.DataFrame:
+  """Datasets en inglés traducidos (python main.py traducir).
+
+  Sólo se usan en la etapa binaria: sus categorías 1-4 salen de reglas
+  léxicas y meterían ruido en el clasificador de gravedad.
+  """
+  if not config.ENGLISH_TRANSLATED_CSV.exists():
+    return pd.DataFrame(columns=['texto', 'ciberacoso', 'categoria', 'fuente'])
+  df = pd.read_csv(config.ENGLISH_TRANSLATED_CSV).dropna(subset=['texto'])
+  df['ciberacoso'] = df['ciberacoso'].astype(int)
+  return df[['texto', 'ciberacoso', 'categoria']].assign(fuente='ingles')
 
 
 def load_refuerzo() -> pd.DataFrame:
@@ -131,6 +145,7 @@ def build_binary_dataset(n_corpus_negatives: int | None = 6000) -> pd.DataFrame:
   """Dataset para la etapa 1: ¿es ciberacoso? (0/1)."""
   df = pd.concat(
       [
+          load_english_translated(),
           load_corpus(n_corpus_negatives),
           load_colombian(),
           load_refuerzo(),

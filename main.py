@@ -5,6 +5,10 @@
     python main.py train-roberta   fine-tuning de RoBERTuito (5 categorías)
     python main.py audit           detecta etiquetas sospechosas en el dataset
     python main.py bot             inicia el bot de Discord
+    python main.py bluesky         bot de Bluesky (responde a menciones)
+    python main.py vigilancia      vigila cuentas de Bluesky sin menciones
+    python main.py bluesky-diag    muestra las últimas notificaciones del bot
+    python main.py traducir        traduce los datasets en inglés (una vez)
 """
 
 import argparse
@@ -66,6 +70,10 @@ def main():
   sub.add_parser('train-roberta', help='Fine-tuning de RoBERTuito', add_help=False)
   sub.add_parser('audit', help='Audita etiquetas del dataset')
   sub.add_parser('bot', help='Inicia el bot de Discord')
+  sub.add_parser('bluesky', help='Bot de Bluesky por menciones')
+  sub.add_parser('vigilancia', help='Vigilancia de cuentas de Bluesky')
+  sub.add_parser('bluesky-diag', help='Diagnóstico de notificaciones de Bluesky')
+  sub.add_parser('traducir', help='Traduce los datasets en inglés', add_help=False)
   args, extra = parser.parse_known_args()
 
   if args.cmd == 'train':
@@ -80,6 +88,18 @@ def main():
   elif args.cmd == 'bot':
     from src.bot_Discord.bot import main as run_bot
     run_bot()
+  elif args.cmd == 'bluesky':
+    from src.bot_bluesky.bot import main as run_bluesky
+    run_bluesky()
+  elif args.cmd == 'vigilancia':
+    from src.bot_bluesky.vigilancia import main as run_vigilancia
+    run_vigilancia()
+  elif args.cmd == 'bluesky-diag':
+    from src.bot_bluesky.diagnostico import main as run_diag
+    run_diag()
+  elif args.cmd == 'traducir':
+    from src.translate_english import main as run_traducir
+    run_traducir(extra)
   else:
     run_interactive_cli(use_roberta=not getattr(args, 'sin_roberta', False))
 

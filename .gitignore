@@ -51,3 +51,6 @@ Thumbs.db
 models/roberta_finetuned/
 data/processed/label_review.csv
 models/pretrained/
+
+# Registro local de la vigilancia de Bluesky
+data/vigilancia_bluesky.json

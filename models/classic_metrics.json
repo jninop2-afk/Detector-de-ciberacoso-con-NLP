@@ -1,5 +1,5 @@
 {
-  "entrenado_en": "2026-10-24T16:21:38",
+  "entrenado_en": "2026-10-29T16:22:44",
   "binario": {
     "modelo": "logreg_C5",
     "cv_scores": {

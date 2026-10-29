@@ -21,7 +21,8 @@ from src.predict import CyberbullyingDetector
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(name)s: %(message)s')
 log = logging.getLogger('bot')
 
-BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN')
+# DISCORD_TOKEN se acepta por compatibilidad con el .env del proyecto anterior
+BOT_TOKEN = os.getenv('DISCORD_BOT_TOKEN') or os.getenv('DISCORD_TOKEN')
 ADMIN_MOD_CHANNEL_ID = int(os.getenv('ADMIN_MOD_CHANNEL_ID', '0'))
 
 

@@ -1,4 +1,4 @@
-# Detector de ciberacoso (NLP + ML + RoBERTa) — Bot de Discord
+# Detector de ciberacoso (NLP + ML + RoBERTa) — Bots de Discord y Bluesky
 
 Sistema híbrido para detectar ciberacoso en español colombiano y de redes
 sociales, con 5 categorías:
@@ -59,6 +59,10 @@ python main.py train            # entrena el modelo clásico (~minutos)
 python main.py train-roberta    # fine-tuning de RoBERTuito (lento en CPU)
 python main.py                  # consola de pruebas
 python main.py bot              # bot de Discord
+python main.py bluesky          # bot de Bluesky (responde a menciones)
+python main.py vigilancia       # vigila cuentas de Bluesky sin menciones
+python main.py bluesky-diag     # últimas notificaciones de la cuenta del bot
+python main.py traducir         # traduce los datasets en inglés (una vez)
 python main.py audit            # busca etiquetas mal asignadas
 ```
 
@@ -69,22 +73,15 @@ minutos. Copia la carpeta resultante a `models/roberta_finetuned/`.
 
 ### `.env`
 
-```
-DISCORD_BOT_TOKEN=...
-ADMIN_MOD_CHANNEL_ID=...
-# Opcionales
-ROBERTA_ENABLED=1
-CONFIDENCE_THRESHOLD=0.70
-UNCERTAINTY_MARGIN=0.20
-MIN_CLASS_F1=0.60
-ROBERTA_WEIGHT=0.70
-```
+Copia `.env.example` a `.env` y completa los valores. El token de Discord
+puede llamarse `DISCORD_BOT_TOKEN` o `DISCORD_TOKEN` (nombre del proyecto
+anterior).
 
 El bot necesita los permisos *Gestionar mensajes* y *Moderar miembros*, y los
 intents *Message Content* y *Server Members* activados en el portal de
 desarrolladores.
 
-## Comandos del bot
+## Comandos del bot de Discord
 
 | Comando | Permiso | Descripción |
 |---------|---------|-------------|
@@ -97,6 +94,37 @@ desarrolladores.
 Reglas de sanción: alertas 1-3 → advertencia; alerta 4 o más → silencio de
 1 hora; 4 alertas consecutivas (sin mensajes limpios entre ellas) → bloqueo
 indefinido.
+
+## Bluesky
+
+Ambos modos usan el mismo detector híbrido que Discord y la cuenta definida
+en `BLUESKY_HANDLE` / `BLUESKY_APP_PASSWORD`.
+
+**Menciones** (`python main.py bluesky`): alguien responde a un post
+mencionando al bot y éste analiza el post original (o la propia mención si
+no es respuesta) y contesta con la categoría. Si la mención incluye la
+palabra `reportar`, además reporta el post a la moderación.
+
+**Vigilancia** (`python main.py vigilancia`): revisa cada
+`BLUESKY_INTERVALO` segundos los posts recientes de las cuentas en
+`BLUESKY_CUENTAS_VIGILADAS` y las respuestas que reciben. No publica nada:
+registra lo detectado en `data/vigilancia_bluesky.json`.
+
+**Reportes**: sólo se reporta cuando el detector sugiere `SANCIONAR` y la
+confianza supera `BLUESKY_UMBRAL_REPORTE`; los casos `REVISAR_POR_ADMIN` no
+se reportan. Por defecto es una simulación; `BLUESKY_REPORTES_REALES=1`
+envía reportes reales.
+
+## Datasets en inglés
+
+`data/raw/` incluye los datasets de Twitter (racismo, sexismo) y YouTube.
+`python main.py traducir` traduce al español los mensajes ofensivos y una
+muestra de 500 no ofensivos por archivo (`--negativos N`,
+`--max-por-archivo N` para una prueba rápida), y los guarda en
+`data/processed/ingles_traducido.csv`. Es lento pero reanudable. En el
+siguiente `python main.py train` esos textos se usan **sólo en la etapa
+binaria**: su categoría 1-4 sale de reglas léxicas y metería ruido en el
+clasificador de gravedad.
 
 ## Mejorar la calidad de las etiquetas
 
@@ -121,4 +149,6 @@ src/predict.py           detector híbrido en cascada
 src/label_audit.py       detección de etiquetas erróneas
 src/database.py          SQLite del bot
 src/bot_Discord/         bot, botones de revisión y reglas de sanción
+src/bot_bluesky/         bot por menciones, vigilancia y diagnóstico
+src/translate_english.py traducción de los datasets en inglés
 ```
