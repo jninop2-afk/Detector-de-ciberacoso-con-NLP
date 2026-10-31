@@ -64,6 +64,7 @@ python main.py vigilancia       # vigila cuentas de Bluesky sin menciones
 python main.py bluesky-diag     # últimas notificaciones de la cuenta del bot
 python main.py traducir         # traduce los datasets en inglés (una vez)
 python main.py audit            # busca etiquetas mal asignadas
+python main.py backup           # copia de seguridad de la base de datos
 ```
 
 Opciones de fine-tuning: `--epochs 4 --batch-size 16 --lr 3e-5
@@ -77,19 +78,54 @@ Copia `.env.example` a `.env` y completa los valores. El token de Discord
 puede llamarse `DISCORD_BOT_TOKEN` o `DISCORD_TOKEN` (nombre del proyecto
 anterior).
 
-El bot necesita los permisos *Gestionar mensajes* y *Moderar miembros*, y los
-intents *Message Content* y *Server Members* activados en el portal de
-desarrolladores.
+Los intents *Message Content* y *Server Members* deben estar activados en el
+portal de desarrolladores. Al arrancar, el bot imprime su **enlace de
+invitación** con los permisos necesarios: *Gestionar mensajes*, *Moderar
+miembros*, *Gestionar canales* y *Gestionar roles* (los dos últimos sirven
+para crear el canal privado de moderación). Su rol debe estar por encima de
+los usuarios que deba silenciar.
 
-## Comandos del bot de Discord
+## Bot de Discord (multi-servidor)
 
-| Comando | Permiso | Descripción |
-|---------|---------|-------------|
-| `!analizar <texto>` | Gestionar mensajes | Prueba el detector sin sancionar |
-| `!estado @usuario` | Gestionar mensajes | Alertas y bloqueo del usuario |
-| `!modelo` | Gestionar mensajes | Métricas del modelo cargado |
-| `!desbloquear @usuario` | Administrador | Quita bloqueo y reinicia alertas |
-| `!reentrenar` | Administrador | Reentrena el clásico con el feedback |
+Cualquier servidor puede añadir el bot con el enlace de invitación. **No
+analiza ningún mensaje hasta que un administrador use `/configurar`**; el
+dueño del servidor recibe estas instrucciones por MD al añadirlo.
+
+### Privacidad: sólo los administradores ven y deciden
+
+- Todos los comandos son *slash commands* restringidos a **Administrador**:
+  Discord no se los muestra al resto de miembros, y las respuestas son
+  efímeras (sólo las ve quien ejecutó el comando).
+- `/configurar` crea un canal **privado** (`#moderacion-ciberacoso`) o vuelve
+  privado el canal indicado. Si otros roles tienen acceso explícito al canal,
+  el bot lo avisa.
+- Los botones de revisión sólo funcionan para administradores.
+- Por defecto **no se publica nada en los canales**: el infractor recibe un
+  MD y los administradores un reporte en el canal privado. Los avisos
+  públicos se activan con `/configurar avisos_publicos:True`.
+
+### Comandos de administradores (cada servidor)
+
+| Comando | Descripción |
+|---------|-------------|
+| `/configurar [canal] [avisos_publicos]` | Activa el bot y define el canal privado de moderación |
+| `/analizar texto` | Prueba el detector sin sancionar |
+| `/estado usuario` | Alertas y bloqueo del usuario |
+| `/desbloquear usuario` | Quita bloqueo y reinicia alertas |
+| `/modelo` | Métricas del modelo y feedback del servidor |
+
+### Comandos del dueño del bot (sólo en `OWNER_GUILD_ID`)
+
+| Comando | Descripción |
+|---------|-------------|
+| `/reentrenar` | Hace una copia de seguridad y reentrena el clásico con el feedback de confianza |
+| `/servidores` | Servidores donde está el bot, si están configurados y cuánto feedback aportan |
+| `/confiar servidor_id confiar` | Decide si el feedback de un servidor se usa al reentrenar |
+
+Todos los servidores comparten el mismo modelo, así que **sólo se entrena con
+feedback de servidores de confianza** (el tuyo lo es automáticamente, y el
+feedback anterior a este cambio también se usa). Así un administrador externo
+no puede estropear el modelo clasificando mal a propósito.
 
 Reglas de sanción: alertas 1-3 → advertencia; alerta 4 o más → silencio de
 1 hora; 4 alertas consecutivas (sin mensajes limpios entre ellas) → bloqueo
@@ -106,14 +142,61 @@ no es respuesta) y contesta con la categoría. Si la mención incluye la
 palabra `reportar`, además reporta el post a la moderación.
 
 **Vigilancia** (`python main.py vigilancia`): revisa cada
-`BLUESKY_INTERVALO` segundos los posts recientes de las cuentas en
-`BLUESKY_CUENTAS_VIGILADAS` y las respuestas que reciben. No publica nada:
-registra lo detectado en `data/vigilancia_bluesky.json`.
+`BLUESKY_INTERVALO` segundos las respuestas que reciben los posts recientes
+de las cuentas vigiladas. No publica nada: registra lo detectado en
+`data/vigilancia_bluesky.json`. Hay dos tipos de cuentas vigiladas:
+
+- Las de `BLUESKY_CUENTAS_VIGILADAS` (las decide el dueño del bot); de ellas
+  también se analizan sus propios posts.
+- Las que lo piden **mencionando al bot con `vigilar`** (y salen con
+  `dejar de vigilar`). Cada persona sólo puede pedirlo para su propia cuenta
+  y de ella sólo se analizan las respuestas que recibe, nunca sus posts. Hay
+  un máximo de `BLUESKY_MAX_VIGILADAS` cuentas. La lista se relee en cada
+  ciclo: no hace falta reiniciar la vigilancia.
 
 **Reportes**: sólo se reporta cuando el detector sugiere `SANCIONAR` y la
 confianza supera `BLUESKY_UMBRAL_REPORTE`; los casos `REVISAR_POR_ADMIN` no
 se reportan. Por defecto es una simulación; `BLUESKY_REPORTES_REALES=1`
 envía reportes reales.
+
+## Base de datos y copias de seguridad
+
+`data/bot_database.db` (SQLite) es compartida por todos los bots. Usa modo
+WAL, así que el bot de Discord, el de Bluesky y la vigilancia pueden correr
+a la vez sin errores de "database is locked".
+
+El bot de Discord hace una copia automática cada 24 horas (y otra antes de
+cada `/reentrenar`); también puede lanzarse con `python main.py backup`. Las
+copias van a `BACKUP_DIR` (por defecto `backups/`) y se conservan las
+últimas `BACKUP_KEEP`. Para protegerse si se pierde la máquina, apunta
+`BACKUP_DIR` a una carpeta sincronizada fuera de ella.
+
+## Despliegue en un servidor (Oracle Cloud / Ubuntu)
+
+Los bots sólo hacen conexiones salientes: no hace falta abrir puertos.
+
+```bash
+git clone https://github.com/jninop2-afk/Detector-de-ciberacoso-con-NLP.git MPB
+cd MPB
+bash deploy/setup.sh                         # Python, entorno y dependencias
+# subir desde tu PC: models/, data/ y .env (no están en git)
+bash deploy/install_services.sh bot bluesky vigilancia
+```
+
+Cada bot es un servicio systemd (`cyberbot@bot`, `cyberbot@bluesky`,
+`cyberbot@vigilancia`): arranca solo al encender la máquina y se reinicia si
+se cae. `deploy/constraints.txt` fija las versiones con las que se entrenaron
+los modelos.
+
+| Tarea | Comando |
+|-------|---------|
+| Ver registros en vivo | `journalctl -u cyberbot@bot -f` |
+| Estado | `systemctl status cyberbot@bot` |
+| Reiniciar / parar | `sudo systemctl restart cyberbot@bot` / `sudo systemctl stop cyberbot@bot` |
+| Actualizar código | `bash deploy/update.sh` |
+
+No ejecutes el mismo bot en tu PC y en el servidor a la vez: ambos
+responderían a cada mensaje (sanciones y respuestas duplicadas).
 
 ## Datasets en inglés
 

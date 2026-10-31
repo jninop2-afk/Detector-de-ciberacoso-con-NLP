@@ -1,0 +1,15 @@
+# Versiones exactas con las que se entrenaron los modelos.
+# El modelo clásico (classic_model.joblib) es un objeto de scikit-learn
+# serializado: sólo carga de forma fiable con las mismas versiones.
+scikit-learn==1.9.1
+numpy==2.5.4
+scipy==1.18.1
+joblib==1.6.0
+pandas==3.1.0
+torch==2.15.0
+transformers==5.22.1
+tokenizers==0.23.3
+safetensors==0.8.0
+discord.py==2.7.1
+atproto==0.0.73
+emoji==2.16.0

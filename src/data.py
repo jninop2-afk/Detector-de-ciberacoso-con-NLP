@@ -92,18 +92,24 @@ def load_feedback() -> pd.DataFrame:
       frames.append(df[['texto', 'categoria']])
 
   if config.DB_PATH.exists():
+    from src.database import init_db
+
+    init_db()  # asegura columnas/tablas nuevas en BDs antiguas
     with sqlite3.connect(config.DB_PATH) as conn:
-      has_table = conn.execute(
-          "SELECT 1 FROM sqlite_master WHERE type='table' AND name='admin_feedback'"
-      ).fetchone()
-      if has_table:
-        frames.append(
-            pd.read_sql_query(
-                'SELECT message_text AS texto, category AS categoria'
-                ' FROM admin_feedback ORDER BY id',
-                conn,
-            )
-        )
+      # Sólo feedback de servidores de confianza (o anterior al registro de
+      # servidor): evita que un admin externo envenene el modelo compartido
+      frames.append(
+          pd.read_sql_query(
+              """
+              SELECT f.message_text AS texto, f.category AS categoria
+              FROM admin_feedback f
+              LEFT JOIN guild_config g ON g.guild_id = f.guild_id
+              WHERE f.guild_id IS NULL OR g.feedback_trusted = 1
+              ORDER BY f.id
+              """,
+              conn,
+          )
+      )
 
   if not frames:
     return pd.DataFrame(columns=['texto', 'ciberacoso', 'categoria', 'fuente'])

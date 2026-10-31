@@ -36,6 +36,18 @@ ENGLISH_TRANSLATED_CSV = PROCESSED_DIR / 'ingles_traducido.csv'
 
 DB_PATH = DATA_DIR / 'bot_database.db'
 
+# --- Copias de seguridad ---
+BACKUP_DIR = Path(os.getenv('BACKUP_DIR', 'backups'))
+if not BACKUP_DIR.is_absolute():
+  BACKUP_DIR = BASE_DIR / BACKUP_DIR
+BACKUP_KEEP = int(os.getenv('BACKUP_KEEP', '14'))  # copias que se conservan
+
+# --- Discord ---
+# Servidor del dueño del bot: allí se registran /reentrenar y /confiar, y su
+# feedback se usa siempre para reentrenar. Si no se indica, se deduce del
+# canal ADMIN_MOD_CHANNEL_ID.
+OWNER_GUILD_ID = int(os.getenv('OWNER_GUILD_ID', '0'))
+
 # --- Bluesky ---
 BLUESKY_HANDLE = os.getenv('BLUESKY_HANDLE')
 BLUESKY_APP_PASSWORD = os.getenv('BLUESKY_APP_PASSWORD')
@@ -49,6 +61,8 @@ BLUESKY_CUENTAS_VIGILADAS = [
     if c.strip()
 ]
 BLUESKY_VIGILANCIA_JSON = DATA_DIR / 'vigilancia_bluesky.json'
+# Máximo de cuentas que pueden pedir vigilancia mencionando al bot
+BLUESKY_MAX_VIGILADAS = int(os.getenv('BLUESKY_MAX_VIGILADAS', '50'))
 
 # Artefactos de modelos
 CLASSIC_MODEL_PATH = MODELS_DIR / 'classic_model.joblib'

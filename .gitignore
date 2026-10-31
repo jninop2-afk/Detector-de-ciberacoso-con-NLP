@@ -54,3 +54,6 @@ models/pretrained/
 
 # Registro local de la vigilancia de Bluesky
 data/vigilancia_bluesky.json
+
+# Copias de seguridad de la base de datos
+backups/

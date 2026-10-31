@@ -9,6 +9,7 @@
     python main.py vigilancia      vigila cuentas de Bluesky sin menciones
     python main.py bluesky-diag    muestra las últimas notificaciones del bot
     python main.py traducir        traduce los datasets en inglés (una vez)
+    python main.py backup          copia de seguridad de la base de datos
 """
 
 import argparse
@@ -74,6 +75,7 @@ def main():
   sub.add_parser('vigilancia', help='Vigilancia de cuentas de Bluesky')
   sub.add_parser('bluesky-diag', help='Diagnóstico de notificaciones de Bluesky')
   sub.add_parser('traducir', help='Traduce los datasets en inglés', add_help=False)
+  sub.add_parser('backup', help='Copia de seguridad de la base de datos')
   args, extra = parser.parse_known_args()
 
   if args.cmd == 'train':
@@ -100,6 +102,9 @@ def main():
   elif args.cmd == 'traducir':
     from src.translate_english import main as run_traducir
     run_traducir(extra)
+  elif args.cmd == 'backup':
+    from src.backup import main as run_backup
+    run_backup()
   else:
     run_interactive_cli(use_roberta=not getattr(args, 'sin_roberta', False))
 

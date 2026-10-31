@@ -1,0 +1,30 @@
+# Plantilla systemd: una instancia por bot.
+#   cyberbot@bot         -> python main.py bot         (Discord)
+#   cyberbot@bluesky     -> python main.py bluesky     (menciones)
+#   cyberbot@vigilancia  -> python main.py vigilancia  (vigilancia)
+# __USER__ y __APP_DIR__ los reemplaza deploy/install_services.sh
+
+[Unit]
+Description=Detector de ciberacoso (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__APP_DIR__
+ExecStart=__APP_DIR__/env/bin/python main.py %i
+Restart=always
+RestartSec=15
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONIOENCODING=utf-8
+# Los modelos ya están en disco: no intentar descargarlos de Hugging Face
+Environment=HF_HUB_OFFLINE=1
+Environment=TOKENIZERS_PARALLELISM=false
+# Con 2 núcleos y varios bots, cada proceso usa 2 hilos para no pelearse
+Environment=OMP_NUM_THREADS=2
+MemoryMax=3G
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

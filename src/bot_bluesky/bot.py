@@ -12,11 +12,13 @@ Ejecutar desde la raíz del proyecto:
 """
 
 import logging
+import re
 import time
 
 from atproto import Client, models
 
 from src import config
+from src import database as db
 from src.bot_bluesky.common import (
     MAX_CARACTERES, analizar, construir_respuesta, gestionar_reporte,
     get_detector, limpiar_menciones, login, modo_reportes,
@@ -25,6 +27,33 @@ from src.bot_bluesky.common import (
 log = logging.getLogger('bluesky')
 
 PALABRA_COMANDO = 'reportar'
+# Sólo al inicio de la mención, para no confundirlo con una frase normal
+RE_DEJAR_VIGILAR = re.compile(r'^(dejar de vigilar|deja de vigilar|no vigilar)\b')
+RE_VIGILAR = re.compile(r'^(vigilar|vig[ií]lame|vigilarme)\b')
+
+
+def comando_vigilancia(notif) -> str | None:
+  """Procesa 'vigilar' / 'dejar de vigilar'. Devuelve la respuesta o None.
+
+  Cada persona sólo puede pedir vigilancia para SU PROPIA cuenta: así nadie
+  puede poner bajo vigilancia a terceros sin su consentimiento.
+  """
+  texto = limpiar_menciones(notif.record.text).lower()
+  handle = notif.author.handle
+  if RE_DEJAR_VIGILAR.match(texto):
+    if db.remove_bluesky_watch(handle):
+      return 'Listo, dejé de vigilar las respuestas a tus posts.'
+    return 'Tu cuenta no estaba en vigilancia.'
+  if RE_VIGILAR.match(texto):
+    estado = db.add_bluesky_watch(handle)
+    if estado == 'ya_existe':
+      return 'Tu cuenta ya está en vigilancia. Para salir, menciónanme con "dejar de vigilar".'
+    if estado == 'limite':
+      return 'Ahora mismo no hay cupo para vigilar más cuentas. Inténtalo más tarde.'
+    return ('Desde ahora reviso las respuestas que reciben tus posts para detectar '
+            'ciberacoso. Tus propios posts no se analizan. Para salir, menciónanme '
+            'con "dejar de vigilar".')
+  return None
 
 
 def obtener_objetivo(client: Client, notif):
@@ -57,6 +86,11 @@ def procesar_notificaciones(client: Client) -> None:
 
   for notif in reversed(pendientes):  # de la más antigua a la más nueva
     try:
+      respuesta_vigilancia = comando_vigilancia(notif)
+      if respuesta_vigilancia is not None:
+        responder(client, notif, respuesta_vigilancia)
+        log.info('Vigilancia solicitada por %s: %s', notif.author.handle, respuesta_vigilancia)
+        continue
       texto, uri, cid = obtener_objetivo(client, notif)
       r = analizar(texto)
       mensaje = construir_respuesta(r)
@@ -74,6 +108,7 @@ def procesar_notificaciones(client: Client) -> None:
 
 def main() -> None:
   logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
+  db.init_db()
   client = login()
   if client is None:
     return

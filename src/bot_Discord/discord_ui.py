@@ -10,6 +10,11 @@ from src import config
 from src import database as db
 from src.bot_Discord.moderation import apply_infraction, truncate
 
+def is_admin(interaction: discord.Interaction) -> bool:
+  perms = getattr(interaction.user, 'guild_permissions', None)
+  return perms is not None and perms.administrator
+
+
 BUTTON_STYLES = {
     0: discord.ButtonStyle.success,
     1: discord.ButtonStyle.danger,
@@ -40,10 +45,9 @@ class ReviewButton(
     return cls(int(match['review_id']), int(match['category']))
 
   async def interaction_check(self, interaction: discord.Interaction) -> bool:
-    perms = getattr(interaction.user, 'guild_permissions', None)
-    if perms is None or not perms.manage_messages:
+    if not is_admin(interaction):
       await interaction.response.send_message(
-          'Sólo moderadores pueden clasificar mensajes.', ephemeral=True
+          'Sólo los administradores pueden clasificar mensajes.', ephemeral=True
       )
       return False
     return True
@@ -92,9 +96,11 @@ class ReviewButton(
         await interaction.followup.send('El usuario ya no está en el servidor.', ephemeral=True)
         return
 
+    cfg = db.get_guild_config(guild.id) or {}
     _, _, sanction = await apply_infraction(
-        member, channel or interaction.channel, review['message_text'],
-        self.category, interaction.channel,
+        member, channel, review['message_text'], self.category,
+        interaction.channel, public_notices=cfg.get('public_notices', False),
+        source=f'revisión de {interaction.user}',
     )
     await interaction.followup.send(
         f'Alerta registrada a {member.mention}'
