@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
-# Instala el proyecto en un servidor Ubuntu (Oracle Cloud, Ampere ARM o x86).
+# Instala Python, el entorno virtual y las dependencias en un servidor Ubuntu
+# (Hetzner Cloud, x86 o ARM). Se ejecuta con el usuario normal, no con root,
+# después de deploy/prepare_server.sh.
 # Uso, desde la carpeta del proyecto:  bash deploy/setup.sh
 set -euo pipefail
+
+if [ "$(id -u)" -eq 0 ]; then
+  echo "No lo ejecutes como root: entra con tu usuario (ssh cyberbot@<IP>)."; exit 1
+fi
 
 APP_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 PY_VERSION="${PY_VERSION:-3.14}"
@@ -35,4 +41,5 @@ PY
 
 mkdir -p backups
 echo
-echo "Instalación lista. Siguiente paso: subir models/, data/ y .env (ver README)."
+echo "Instalación lista. Siguiente paso, desde tu PC:"
+echo "    powershell -ExecutionPolicy Bypass -File deploy\\subir_al_servidor.ps1 -Servidor <IP>"

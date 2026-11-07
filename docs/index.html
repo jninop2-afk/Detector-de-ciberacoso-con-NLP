@@ -1,0 +1,808 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sistema de Detección de Ciberacoso</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Sistema de detección de ciberacoso en español colombiano con NLP y RoBERTa, disponible como bot de Discord y de Bluesky.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: hero oscuro a pantalla con una hélice de partículas (los "mensajes") a la derecha y una tarjeta de cristal con un análisis en vivo; debajo, secciones sobrias sobre el mismo negro. Diseño deliberadamente de un solo tema (oscuro). */
+:root {
+  color-scheme: dark;
+  --bg: #050806;
+  --bg-raise: #0A110D;
+  --glass: rgba(14, 22, 17, 0.72);
+  --line: rgba(220, 255, 230, 0.09);
+  --line-strong: rgba(220, 255, 230, 0.18);
+  --ink: #EDF3EE;
+  --muted: #8D9B92;
+  --dim: #5E6B63;
+  --green: #3CFF7E;
+  --green-deep: #0F3D22;
+  --cat0: #6CE59A; --cat1: #FF7A6E; --cat2: #FFA55E; --cat3: #D592F0; --cat4: #E7C760;
+  --font: 'Geist', 'Segoe UI', system-ui, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, Consolas, monospace;
+  --step--1: 0.8125rem; --step-0: 1rem; --step-1: 1.1875rem; --step-2: 1.5rem; --step-3: clamp(1.9rem, 3.4vw, 2.6rem); --step-4: clamp(2.5rem, 5.6vw, 4.4rem);
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; background: var(--bg); }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: var(--step-0); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+h1, h2, h3 { margin: 0; font-weight: 400; line-height: 1.08; letter-spacing: -0.025em; text-wrap: balance; }
+p { margin: 0; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; border-radius: 6px; }
+.mono { font-family: var(--mono); }
+
+.wrap { max-width: 1200px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.eyebrow { font-size: var(--step--1); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+
+/* Barra superior */
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--bg); }
+.top { position: absolute; top: env(safe-area-inset-top, 0px); left: 0; right: 0; z-index: 20; }
+.top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-block: 22px; border-bottom: 1px solid var(--line); }
+.brand { display: flex; align-items: center; gap: 12px; text-decoration: none; font-size: var(--step-1); font-weight: 500; letter-spacing: -0.01em; }
+.brand-mark { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; background: radial-gradient(circle at 50% 40%, #16492A, #0A1A10 70%); border: 1px solid var(--line-strong); box-shadow: 0 0 18px rgba(60, 255, 126, .18); }
+.brand-mark svg { width: 18px; height: 18px; }
+.nav { display: flex; gap: 40px; }
+.nav a { text-decoration: none; color: var(--muted); font-size: 0.9rem; transition: color .2s; }
+.nav a:hover { color: var(--ink); }
+.top-actions { display: flex; align-items: center; gap: 8px; }
+.link-quiet { text-decoration: none; color: var(--muted); font-size: 0.9rem; padding: 9px 12px; }
+.link-quiet:hover { color: var(--ink); }
+.btn-outline { text-decoration: none; font-size: 0.9rem; padding: 9px 18px; border-radius: 10px; border: 1px solid var(--line-strong); background: rgba(255,255,255,.03); transition: border-color .2s, background .2s; }
+.btn-outline:hover { border-color: var(--green); background: rgba(60,255,126,.06); }
+@media (max-width: 900px) { .nav { display: none; } }
+@media (max-width: 480px) { .link-quiet { display: none; } }
+
+/* Hero */
+.hero { position: relative; overflow: hidden; min-height: min(820px, 100svh); display: flex; flex-direction: column; isolation: isolate; }
+#helix { position: absolute; top: 0; right: 0; width: 62%; height: 100%; z-index: -1; display: block; }
+.hero::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse 60% 70% at 78% 45%, rgba(60,255,126,.10), transparent 70%), linear-gradient(90deg, var(--bg) 30%, transparent 62%); }
+.hero > .wrap { width: 100%; }
+.hero-inner { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 26px; padding-top: 140px; padding-bottom: 40px; }
+.hero-copy { display: flex; flex-direction: column; gap: 26px; max-width: 640px; }
+.pill { display: inline-flex; align-items: center; gap: 10px; width: fit-content; padding: 6px 14px 6px 10px; border-radius: 999px; border: 1px solid var(--line-strong); background: rgba(255,255,255,.03); font-size: 0.82rem; color: var(--ink); text-decoration: none; }
+.pill:hover { border-color: var(--green); }
+.pill-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); }
+.hero h1 { font-size: var(--step-4); }
+.hero h1 .accent { color: var(--green); text-shadow: 0 0 36px rgba(60,255,126,.35); }
+.hero-lead { color: var(--muted); font-size: var(--step-1); max-width: 54ch; line-height: 1.55; }
+.cta-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.btn-light { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; background: #F4F7F5; color: #08100B; font-weight: 500; padding: 12px 20px; border-radius: 10px; transition: transform .15s, box-shadow .2s; }
+.btn-light:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(60,255,126,.18); }
+.btn-ghost { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); padding: 12px 18px; border-radius: 10px; border: 1px solid var(--line-strong); }
+.btn-ghost:hover { border-color: var(--green); }
+.btn-light svg, .btn-ghost svg { width: 16px; height: 16px; }
+
+.hero-foot { display: flex; justify-content: space-between; align-items: flex-end; gap: 32px; padding-bottom: 48px; flex-wrap: wrap; }
+.platforms { display: flex; flex-direction: column; gap: 18px; }
+.platform-row { display: flex; gap: 28px; align-items: center; flex-wrap: wrap; }
+.platform-row a { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); text-decoration: none; font-size: 0.95rem; transition: color .2s; }
+.platform-row a:hover { color: var(--ink); }
+.platform-row svg { width: 26px; height: 26px; }
+
+/* Tarjeta de cristal (análisis en vivo) */
+.glass { background: var(--glass); border: 1px solid var(--line-strong); border-radius: 16px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.live { width: min(400px, 100%); padding: 18px; display: grid; grid-template-columns: 96px 1fr; gap: 16px; box-shadow: 0 20px 60px -20px rgba(0,0,0,.8); }
+.live > * { min-width: 0; }
+.live-art { border-radius: 10px; background: radial-gradient(circle at 50% 45%, #134A2A 0%, #07140C 70%); display: grid; place-items: center; position: relative; overflow: hidden; min-height: 96px; }
+.live-num { font: 500 2.6rem var(--mono); color: var(--c, var(--green)); text-shadow: 0 0 24px var(--c, var(--green)); }
+.live-body { display: flex; flex-direction: column; gap: 8px; }
+.live-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.95rem; font-weight: 500; }
+.live-head span:first-child { display: inline-flex; align-items: center; gap: 8px; }
+.live-head svg { width: 14px; height: 14px; color: var(--green); }
+.dots { display: flex; gap: 2px; }
+.dots button { width: 18px; height: 18px; padding: 0; border: 0; background: transparent; cursor: pointer; display: grid; place-items: center; }
+.dots button::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--dim); transition: background .2s; }
+.dots button[aria-current="true"]::before { background: var(--green); }
+.live-msg { font-family: var(--mono); font-size: 0.86rem; color: var(--ink); overflow-wrap: anywhere; }
+.live-clean { font-family: var(--mono); font-size: 0.74rem; color: var(--dim); overflow-wrap: anywhere; }
+.live-verdict { font-size: 0.82rem; color: var(--muted); line-height: 1.45; }
+.live-verdict strong { color: var(--c, var(--green)); font-weight: 500; }
+.fade { animation: fade .5s ease both; }
+@keyframes fade { from { opacity: .2; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .fade { animation: none; } }
+
+@media (max-width: 900px) {
+  #helix { width: 100%; opacity: .45; }
+  .hero::after { background: linear-gradient(180deg, transparent, var(--bg) 92%); }
+}
+@media (max-width: 420px) { .live { grid-template-columns: 1fr; } .live-art { min-height: 72px; } }
+
+/* Secciones */
+.band { padding-block: clamp(72px, 10vw, 120px); border-top: 1px solid var(--line); }
+.section-head { display: flex; flex-direction: column; gap: 16px; margin-bottom: 48px; max-width: 720px; }
+.section-head h2 { font-size: var(--step-3); }
+.section-head p { color: var(--muted); font-size: var(--step-1); max-width: 62ch; }
+
+.features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.feature { background: var(--bg); padding: 32px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.feature svg { width: 24px; height: 24px; color: var(--green); }
+.feature h3 { font-size: var(--step-2); }
+.feature p { color: var(--muted); }
+@media (max-width: 860px) { .features { grid-template-columns: 1fr; } }
+.stack { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 28px; }
+.stack span { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; }
+
+/* Pipeline de predicción: es una secuencia real, por eso va numerada */
+.pipeline { display: flex; flex-direction: column; }
+.pipe-step { display: grid; grid-template-columns: 72px minmax(0, 1fr) minmax(0, 1fr); gap: 32px; padding-block: 32px; border-top: 1px solid var(--line); align-items: start; }
+.pipe-step:last-child { border-bottom: 1px solid var(--line); }
+.pipe-num { font: 500 0.9rem var(--mono); color: var(--green); padding-top: 6px; }
+.pipe-step h3 { font-size: var(--step-2); margin-bottom: 10px; }
+.pipe-step p { color: var(--muted); }
+.pipe-when { display: inline-block; font: 500 0.72rem var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--dim); margin-bottom: 10px; }
+.pipe-detail { min-width: 0; }
+.code { font-family: var(--mono); font-size: 0.85rem; background: var(--bg-raise); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; overflow-x: auto; }
+.code .k { color: var(--dim); }
+.code .v { color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere; }
+.code .g { color: var(--green); }
+.checks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.checks li { display: grid; grid-template-columns: 16px 1fr; gap: 12px; color: var(--muted); font-size: 0.95rem; }
+.checks li::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin: 9px 0 0 4px; }
+.outcomes { display: flex; flex-direction: column; gap: 10px; }
+.outcome { display: grid; grid-template-columns: 170px 1fr; gap: 14px; align-items: baseline; font-size: 0.92rem; color: var(--muted); }
+.outcome b { font: 500 0.78rem var(--mono); color: var(--c); border: 1px solid currentColor; border-radius: 6px; padding: 3px 8px; width: fit-content; }
+@media (max-width: 860px) { .pipe-step { grid-template-columns: 44px minmax(0, 1fr); gap: 16px 20px; } .pipe-detail { grid-column: 2; } }
+@media (max-width: 480px) { .outcome { grid-template-columns: 1fr; gap: 4px; } }
+
+.c0 { --c: var(--cat0); } .c1 { --c: var(--cat1); } .c2 { --c: var(--cat2); } .c3 { --c: var(--cat3); } .c4 { --c: var(--cat4); }
+
+/* Etiquetas */
+.labels { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.label-card { border: 1px solid var(--line); border-radius: 16px; padding: 24px 20px; display: flex; flex-direction: column; gap: 14px; background: linear-gradient(180deg, color-mix(in srgb, var(--c) 7%, transparent), transparent 60%); min-width: 0; }
+.label-num { font: 500 2.2rem var(--mono); color: var(--c); line-height: 1; }
+.label-card h3 { font-size: 1.08rem; font-weight: 500; line-height: 1.3; letter-spacing: -0.01em; }
+.label-card p { color: var(--muted); font-size: 0.88rem; }
+.label-card .ex { font-family: var(--mono); font-size: 0.78rem; color: var(--dim); border-top: 1px solid var(--line); padding-top: 12px; margin-top: auto; overflow-wrap: anywhere; }
+@media (max-width: 1080px) { .labels { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 720px) { .labels { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 460px) { .labels { grid-template-columns: 1fr; } }
+
+/* Métricas */
+.metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.metric { background: var(--bg); padding: 28px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.metric-num { font: 400 clamp(2.2rem, 4vw, 3rem) var(--font); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.metric-num small { font-size: 0.45em; color: var(--muted); margin-left: 4px; letter-spacing: 0; }
+.metric p { color: var(--muted); font-size: 0.9rem; }
+.metric .src { font-family: var(--mono); font-size: 0.72rem; color: var(--dim); }
+@media (max-width: 960px) { .metrics { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 520px) { .metrics { grid-template-columns: 1fr; } }
+.bars { margin-top: 32px; border: 1px solid var(--line); border-radius: 16px; padding: 28px; display: flex; flex-direction: column; gap: 16px; }
+.bars-head { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: baseline; }
+.bars-head h3 { font-size: var(--step-1); font-weight: 500; }
+.legend { display: flex; gap: 18px; font-size: 0.82rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend i { width: 12px; height: 4px; border-radius: 2px; display: inline-block; }
+.bar-row { display: grid; grid-template-columns: 150px 1fr; gap: 16px; align-items: center; }
+.bar-row > * { min-width: 0; }
+.bar-label { font-size: 0.86rem; color: var(--muted); }
+.bar-pair { display: flex; flex-direction: column; gap: 5px; }
+.bar { display: grid; grid-template-columns: 1fr 44px; gap: 10px; align-items: center; font: 0.76rem var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar-track { height: 6px; border-radius: 3px; background: rgba(255,255,255,.05); overflow: hidden; }
+.bar-fill { height: 100%; border-radius: 3px; }
+.bar-fill.classic { background: var(--green); box-shadow: 0 0 12px rgba(60,255,126,.45); }
+.bar-fill.roberta { background: #9FB8A8; }
+.bars .note { font-size: 0.82rem; color: var(--dim); }
+@media (max-width: 520px) { .bar-row { grid-template-columns: 1fr; gap: 6px; } }
+
+/* Usar el bot */
+.switch { display: inline-flex; padding: 4px; border: 1px solid var(--line-strong); border-radius: 12px; gap: 4px; margin-bottom: 36px; }
+.switch button { border: 0; background: transparent; color: var(--muted); font: 500 0.95rem var(--font); padding: 10px 22px; border-radius: 9px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.switch button[aria-selected="true"] { background: #F4F7F5; color: #08100B; }
+.switch svg { width: 16px; height: 16px; }
+.panel { display: grid; grid-template-columns: 1.2fr 1fr; gap: 40px; align-items: start; }
+.panel > * { min-width: 0; }
+@media (max-width: 900px) { .panel { grid-template-columns: 1fr; } }
+.steps { list-style: none; margin: 0; padding: 0; counter-reset: paso; display: flex; flex-direction: column; }
+.steps li { counter-increment: paso; display: grid; grid-template-columns: 40px 1fr; gap: 18px; position: relative; padding-bottom: 32px; }
+.steps li:last-child { padding-bottom: 0; }
+.steps li::before { content: counter(paso); width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--green); color: var(--green); display: grid; place-items: center; font: 500 0.95rem var(--mono); background: var(--bg); position: relative; z-index: 1; box-shadow: 0 0 16px rgba(60,255,126,.15); }
+.steps li:not(:last-child)::after { content: ""; position: absolute; left: 19.5px; top: 40px; bottom: 0; width: 1px; background: var(--line-strong); }
+.step-body { display: flex; flex-direction: column; gap: 10px; padding-top: 6px; min-width: 0; }
+.step-body h3 { font-size: var(--step-2); }
+.step-body p { color: var(--muted); max-width: 58ch; }
+.cmd { font-family: var(--mono); font-size: 0.86em; color: var(--green); background: rgba(60,255,126,.07); border: 1px solid rgba(60,255,126,.18); padding: 1px 7px; border-radius: 6px; }
+.small { font-size: 0.88rem; color: var(--dim) !important; }
+.side { padding: 26px; display: flex; flex-direction: column; gap: 16px; }
+.side h3 { font-size: var(--step-1); font-weight: 500; }
+.perm-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.perm-list li { padding-block: 10px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 2px; font-size: 0.88rem; color: var(--muted); }
+.perm-list li:first-child { padding-top: 0; }
+.perm-list li:last-child { border-bottom: 0; padding-bottom: 0; }
+.perm-list strong { color: var(--ink); font-weight: 500; font-size: 0.95rem; }
+.table-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; }
+th, td { text-align: left; padding: 10px 12px 10px 0; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--muted); }
+th { font: 500 0.7rem var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--dim); }
+td:first-child { white-space: nowrap; font-family: var(--mono); color: var(--green); }
+tr:last-child td { border-bottom: 0; }
+.post { padding: 14px 16px; display: grid; grid-template-columns: 34px 1fr; gap: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-raise); }
+.post > div { min-width: 0; }
+.avatar { width: 34px; height: 34px; border-radius: 50%; background: #16241B; display: grid; place-items: center; font-size: 0.8rem; color: var(--muted); }
+.post-name { font-size: 0.82rem; font-weight: 500; }
+.post-name span { color: var(--dim); font-weight: 400; }
+.post-text { font-size: 0.95rem; overflow-wrap: anywhere; }
+.mention { color: var(--green); }
+.reply { margin-left: 46px; border-style: dashed; }
+.thread { display: flex; flex-direction: column; gap: 10px; }
+.copy-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.copy-row code { font-family: var(--mono); font-size: 0.9rem; overflow-wrap: anywhere; }
+.copy-btn { border: 1px solid var(--line-strong); background: transparent; color: var(--ink); border-radius: 8px; padding: 6px 12px; font: 500 0.82rem var(--font); cursor: pointer; }
+.copy-btn:hover { border-color: var(--green); }
+.placeholder { color: var(--cat4); }
+
+/* Sanciones y privacidad */
+.ladder { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.rung { border: 1px solid var(--line); border-radius: 16px; padding: 26px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.rung .eyebrow { font-size: 0.72rem; }
+.rung h3 { font-size: var(--step-2); }
+.rung p { color: var(--muted); font-size: 0.92rem; }
+.rung.hot { border-color: color-mix(in srgb, var(--cat2) 40%, transparent); background: color-mix(in srgb, var(--cat2) 6%, transparent); }
+.rung.hot h3 { color: var(--cat2); }
+.rung.max { border-color: color-mix(in srgb, var(--cat1) 45%, transparent); background: color-mix(in srgb, var(--cat1) 8%, transparent); }
+.rung.max h3 { color: var(--cat1); }
+@media (max-width: 760px) { .ladder { grid-template-columns: 1fr; } }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; }
+.two > * { min-width: 0; }
+@media (max-width: 900px) { .two { grid-template-columns: 1fr; gap: 48px; } }
+.facts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 22px; }
+.facts li { display: grid; grid-template-columns: 22px 1fr; gap: 16px; }
+.facts svg { width: 20px; height: 20px; color: var(--green); margin-top: 3px; }
+.facts p { color: var(--muted); }
+.facts strong { color: var(--ink); font-weight: 500; }
+details { border-bottom: 1px solid var(--line); padding-block: 18px; }
+details:first-of-type { border-top: 1px solid var(--line); }
+summary { cursor: pointer; font-size: var(--step-1); list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: "+"; font-family: var(--mono); color: var(--green); }
+details[open] summary::after { content: "−"; }
+details p { color: var(--muted); margin-top: 12px; max-width: 62ch; }
+
+footer { border-top: 1px solid var(--line); }
+footer .wrap { padding-block: 36px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 16px; color: var(--dim); font-size: 0.88rem; }
+footer a { color: var(--muted); text-decoration: none; }
+footer a:hover { color: var(--green); }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#inicio">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#3CFF7E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg>
+      </span>
+      ciberacoso.nlp
+    </a>
+    <nav class="nav" aria-label="Secciones">
+      <a href="#sistema">Sistema</a>
+      <a href="#predicciones">Predicciones</a>
+      <a href="#etiquetas">Etiquetas</a>
+      <a href="#usar">Usar el bot</a>
+    </nav>
+    <div class="top-actions">
+      <a class="link-quiet" href="https://github.com/jninop2-afk/Detector-de-ciberacoso-con-NLP" target="_blank" rel="noopener">GitHub</a>
+      <a class="btn-outline" href="#discord" data-go="discord">Agregar bot</a>
+    </div>
+  </div>
+</header>
+
+<main id="inicio">
+  <section class="hero" aria-labelledby="titulo">
+    <canvas id="helix" aria-hidden="true"></canvas>
+    <div class="wrap hero-inner">
+      <div class="hero-copy">
+        <a class="pill" href="#usar"><span class="pill-dot" aria-hidden="true"></span>Versión 2: ahora en Discord y Bluesky <span aria-hidden="true">→</span></a>
+        <h1 id="titulo">Sistema de Detección de Ciberacoso <span class="accent">NLP + RoBERTa</span></h1>
+        <p class="hero-lead">Analiza mensajes en español colombiano, entiende la jerga, el leetspeak y los emojis, y separa la burla entre amigos de la amenaza real. Lo dudoso lo decide una persona.</p>
+        <div class="cta-row">
+          <a class="btn-light" href="#predicciones">Ver cómo funciona
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+          <a class="btn-ghost" href="#discord" data-go="discord">Agregar a Discord</a>
+        </div>
+      </div>
+    </div>
+    <div class="wrap hero-foot">
+      <div class="platforms">
+        <p class="eyebrow">Disponible como bot en</p>
+        <div class="platform-row">
+          <a href="#discord" data-go="discord">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="3"/><path d="M8 21h8M9 10h.01M15 10h.01"/></svg>
+            Discord
+          </a>
+          <a href="#bluesky" data-go="bluesky">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>
+            Bluesky
+          </a>
+        </div>
+      </div>
+      <div class="glass live" aria-live="polite">
+        <div class="live-art" id="live-art"><span class="live-num" id="live-num">2</span></div>
+        <div class="live-body">
+          <div class="live-head">
+            <span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M5 20V10M12 20V4M19 20v-7"/></svg>Análisis en vivo</span>
+            <div class="dots" role="group" aria-label="Ejemplos"></div>
+          </div>
+          <p class="live-msg" id="live-msg"></p>
+          <p class="live-clean" id="live-clean"></p>
+          <p class="live-verdict" id="live-verdict"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="sistema" aria-labelledby="sistema-titulo">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">El sistema</p>
+        <h2 id="sistema-titulo">Moderación que entiende cómo se escribe en Colombia</h2>
+        <p>Una lista de groserías no distingue “parce, qué chimba” de una amenaza, ni reconoce un insulto escrito como “s4p0” o “hp”. Este sistema combina procesamiento de lenguaje natural, un modelo estadístico rápido y un transformer entrenado con tuits en español.</p>
+      </div>
+      <div class="features">
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h10M4 17h7"/><path d="M17 15l2 2 3-4"/></svg>
+          <h3>NLP para la jerga</h3>
+          <p>Normaliza leetspeak, abreviaturas de chat, alargamientos (“bobooo”), risas y emojis antes de clasificar.</p>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h6v6H4zM14 12h6v6h-6z"/><path d="M10 9h4v3"/></svg>
+          <h3>Dos modelos en cascada</h3>
+          <p>El modelo clásico revisa todo en milisegundos. RoBERTuito, más lento, solo entra cuando el primero tiene dudas.</p>
+        </div>
+        <div class="feature">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          <h3>Un humano en el ciclo</h3>
+          <p>Los casos dudosos no se castigan solos: los decide un administrador, y su decisión reentrena el modelo.</p>
+        </div>
+      </div>
+      <div class="stack" aria-label="Tecnologías">
+        <span>Python</span><span>scikit-learn</span><span>TF-IDF</span><span>PyTorch</span><span>Transformers</span><span>RoBERTuito</span><span>discord.py</span><span>atproto</span><span>SQLite</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="predicciones" aria-labelledby="pred-titulo">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Cómo hace las predicciones</p>
+        <h2 id="pred-titulo">Del mensaje crudo a una decisión, en cinco pasos</h2>
+        <p>Cada mensaje sigue este recorrido. La mayoría termina en el paso 2; solo los dudosos llegan a RoBERTuito.</p>
+      </div>
+      <div class="pipeline">
+        <div class="pipe-step">
+          <span class="pipe-num">01</span>
+          <div><span class="pipe-when">siempre</span><h3>Normalización</h3><p>Decodifica leetspeak por palabra, traduce jerga y abreviaturas, reduce letras repetidas, unifica las risas, convierte emojis en palabras y quita tildes.</p></div>
+          <div class="pipe-detail code">
+            <span class="k">entrada</span><span class="v">ese man es un s4p0 🤡</span>
+            <span class="k">normalizado</span><span class="v g">ese man es un sapo emoji_cara_de_payaso</span>
+          </div>
+        </div>
+        <div class="pipe-step">
+          <span class="pipe-num">02</span>
+          <div><span class="pipe-when">siempre · ~14 ms</span><h3>Modelo clásico</h3><p>Convierte el texto en rasgos de palabras (1–2 palabras), de fragmentos de caracteres (2–5 letras) y de un léxico de insultos y amenazas. Decide en dos etapas.</p></div>
+          <div class="pipe-detail code">
+            <span class="k">etapa 1 · ¿es ciberacoso?</span><span class="v">Regresión logística · umbral <span class="g">0,42</span></span>
+            <span class="k">etapa 2 · ¿de qué tipo?</span><span class="v">SVM lineal calibrada · categorías 1 a 4</span>
+          </div>
+        </div>
+        <div class="pipe-step">
+          <span class="pipe-num">03</span>
+          <div><span class="pipe-when">siempre</span><h3>¿Hay sospecha?</h3><p>El clásico revisa su propia respuesta. Si se cumple cualquiera de estas condiciones, consulta al segundo modelo.</p></div>
+          <ul class="pipe-detail checks">
+            <li>La probabilidad queda a menos de 0,20 del umbral</li>
+            <li>La confianza en la categoría o la confianza global está por debajo de 0,70</li>
+            <li>La categoría elegida tuvo un F1 de validación menor a 0,60</li>
+            <li>Dice “seguro”, pero el texto contiene patrones de amenaza u odio</li>
+          </ul>
+        </div>
+        <div class="pipe-step">
+          <span class="pipe-num">04</span>
+          <div><span class="pipe-when">solo si hay sospecha · ~80 ms</span><h3>RoBERTuito</h3><p>Un transformer preentrenado con tuits en español y ajustado con nuestros datos lee la frase completa y su contexto. Su opinión se combina con la del clásico.</p></div>
+          <div class="pipe-detail code">
+            <span class="k">fusión</span><span class="v"><span class="g">70 %</span> RoBERTuito + 30 % clásico</span>
+            <span class="k">si no coinciden</span><span class="v">el caso pasa a un administrador</span>
+          </div>
+        </div>
+        <div class="pipe-step">
+          <span class="pipe-num">05</span>
+          <div><span class="pipe-when">resultado</span><h3>Decisión</h3><p>Cada predicción sale con categoría, confianza, el modelo que decidió y los motivos de sospecha.</p></div>
+          <div class="pipe-detail outcomes">
+            <div class="outcome c0"><b>PERMITIR</b><span>Mensaje sin ciberacoso.</span></div>
+            <div class="outcome c2"><b>SANCIONAR</b><span>Ciberacoso con confianza de 0,70 o más.</span></div>
+            <div class="outcome c4"><b>REVISAR_ADMIN</b><span>Confianza baja o los modelos no se ponen de acuerdo.</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="etiquetas" aria-labelledby="etiquetas-titulo">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Etiquetas</p>
+        <h2 id="etiquetas-titulo">Cinco categorías</h2>
+        <p>Cada mensaje recibe exactamente una. Los datos combinan un corpus colombiano etiquetado a mano, CorpusBullying y ejemplos de refuerzo; las decisiones de los administradores tienen prioridad sobre la etiqueta original.</p>
+      </div>
+      <div class="labels">
+        <div class="label-card c0"><span class="label-num">0</span><h3>Sin ciberacoso</h3><p>Conversación normal, bromas y risas.</p><p class="ex">jajajaja qué golazo parce 😂</p></div>
+        <div class="label-card c1"><span class="label-num">1</span><h3>Hostigamiento y amenazas directas</h3><p>Intimidación o amenazas a una persona.</p><p class="ex">cuando te vea en la salida vas a ver</p></div>
+        <div class="label-card c2"><span class="label-num">2</span><h3>Insultos y ofensas personales</h3><p>Ataques a alguien por su físico, inteligencia o forma de ser.</p><p class="ex">tan bruta q ni pa eso sirve</p></div>
+        <div class="label-card c3"><span class="label-num">3</span><h3>Incitación al odio y muerte</h3><p>Desear la muerte o atacar a un grupo por quién es.</p><p class="ex">deseos de muerte, odio a grupos</p></div>
+        <div class="label-card c4"><span class="label-num">4</span><h3>Difamación, calumnia y ataques políticos</h3><p>Acusaciones falsas y descalificaciones por política.</p><p class="ex">acusaciones sin pruebas, ataques políticos</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="metricas" aria-labelledby="metricas-titulo">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Métricas</p>
+        <h2 id="metricas-titulo">Qué tan bien clasifica</h2>
+        <p>Medido sobre datos que los modelos no vieron al entrenar. Priorizamos el recall: es preferible revisar un mensaje de más que dejar pasar un acoso.</p>
+      </div>
+      <div class="metrics">
+        <div class="metric"><span class="metric-num">0,83</span><p>F1 al detectar si un mensaje es ciberacoso</p><span class="src">clásico · etapa 1</span></div>
+        <div class="metric"><span class="metric-num">0,88</span><p>Recall: de cada 100 casos de acoso, detecta 88</p><span class="src">clásico · etapa 1</span></div>
+        <div class="metric"><span class="metric-num">0,91</span><p>F1 macro al clasificar el tipo de acoso</p><span class="src">clásico · etapa 2</span></div>
+        <div class="metric"><span class="metric-num">0,83</span><p>F1 macro en las cinco categorías a la vez</p><span class="src">RoBERTuito</span></div>
+      </div>
+      <div class="bars" role="group" aria-label="F1 por categoría">
+        <div class="bars-head">
+          <h3>F1 por categoría</h3>
+          <div class="legend"><span><i style="background:var(--green)"></i>Clásico (etapa 2)</span><span><i style="background:#9FB8A8"></i>RoBERTuito</span></div>
+        </div>
+        <div id="bars"></div>
+        <p class="note">No son directamente comparables: el clásico solo clasifica mensajes que ya detectó como acoso, mientras que RoBERTuito elige entre las cinco clases a la vez.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="usar" aria-labelledby="usar-titulo">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">Usar el bot</p>
+        <h2 id="usar-titulo">Elige dónde usarlo</h2>
+        <p>En Discord modera tu servidor por su cuenta. En Bluesky no instalas nada: lo mencionas cuando lo necesitas.</p>
+      </div>
+
+      <div class="switch" role="tablist" aria-label="Plataforma">
+        <button role="tab" id="tab-discord" aria-controls="panel-discord" aria-selected="true" data-tab="discord">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="14" rx="3"/><path d="M8 21h8M9 10h.01M15 10h.01"/></svg>
+          Discord
+        </button>
+        <button role="tab" id="tab-bluesky" aria-controls="panel-bluesky" aria-selected="false" data-tab="bluesky" tabindex="-1">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>
+          Bluesky
+        </button>
+      </div>
+
+      <div class="panel" role="tabpanel" id="panel-discord" aria-labelledby="tab-discord">
+        <ol class="steps">
+          <li>
+            <div class="step-body">
+              <h3>Invita al bot a tu servidor</h3>
+              <p>Necesitas el permiso <strong>Administrar servidor</strong>. Discord te pedirá elegir el servidor y confirmar los permisos.</p>
+              <div class="cta-row">
+                <a class="btn-light" href="https://discord.com/oauth2/authorize?client_id=1563397856583483483&amp;scope=bot+applications.commands&amp;permissions=1099780156432" target="_blank" rel="noopener">
+                  Agregar a Discord
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
+                </a>
+              </div>
+            </div>
+          </li>
+          <li>
+            <div class="step-body">
+              <h3>Actívalo con <span class="cmd">/configurar</span></h3>
+              <p>Hasta que un administrador lo ejecute, el bot no modera nada. Sin parámetros, crea un canal privado donde solo los administradores ven las alertas.</p>
+              <p class="small"><span class="cmd">canal</span> usa un canal tuyo y lo vuelve privado (no acepta los canales principales del servidor). <span class="cmd">avisos_publicos</span> en True avisa también en el canal donde ocurrió; por defecto solo se avisa al infractor por mensaje privado.</p>
+            </div>
+          </li>
+          <li>
+            <div class="step-body">
+              <h3>Listo, ya modera</h3>
+              <p>Los mensajes claros se resuelven solos. Los dudosos llegan a tu canal privado con botones del 0 al 4 para que decidas tú.</p>
+            </div>
+          </li>
+        </ol>
+
+        <div class="glass side">
+          <h3>Permisos que pide</h3>
+          <ul class="perm-list">
+            <li><strong>Ver canales, leer historial y enviar mensajes</strong>Para analizar los mensajes y responder.</li>
+            <li><strong>Gestionar mensajes</strong>Para borrar los que son ciberacoso.</li>
+            <li><strong>Moderar miembros</strong>Para silenciar a quien acumula alertas.</li>
+            <li><strong>Gestionar canales y roles</strong>Para crear el canal privado de moderación.</li>
+          </ul>
+          <h3>Comandos para administradores</h3>
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>Comando</th><th>Para qué sirve</th></tr></thead>
+              <tbody>
+                <tr><td>/configurar</td><td>Activa el bot y crea el canal privado</td></tr>
+                <tr><td>/analizar</td><td>Prueba un texto sin sancionar a nadie</td></tr>
+                <tr><td>/estado</td><td>Alertas y bloqueo de un miembro</td></tr>
+                <tr><td>/desbloquear</td><td>Quita el silencio y reinicia sus alertas</td></tr>
+                <tr><td>/modelo</td><td>Métricas del modelo en uso</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="small">Los comandos son invisibles para quien no es administrador, y sus respuestas solo las ve quien los usa.</p>
+        </div>
+      </div>
+
+      <div class="panel" role="tabpanel" id="panel-bluesky" aria-labelledby="tab-bluesky" hidden>
+        <ol class="steps">
+          <li><div class="step-body"><h3>Analiza un post</h3><p>Responde al post que quieres revisar y menciona al bot. Analiza el post original y te contesta con la categoría detectada.</p></div></li>
+          <li><div class="step-body"><h3>Repórtalo</h3><p>Añade <span class="cmd">reportar</span> a la mención y, si el detector lo confirma con suficiente confianza, envía el post a la moderación de Bluesky.</p></div></li>
+          <li><div class="step-body"><h3>Pide que vigile tu cuenta</h3><p>Menciona al bot con <span class="cmd">vigilar</span> y revisará las respuestas que recibes. Solo para tu propia cuenta. Para salir: <span class="cmd">dejar de vigilar</span>.</p></div></li>
+        </ol>
+        <div class="glass side">
+          <h3>Así se ve</h3>
+          <div class="thread">
+            <div class="post"><div class="avatar" aria-hidden="true">U</div><div><p class="post-name">usuario <span>· hace 5 min</span></p><p class="post-text">cuando te vea en la salida vas a ver</p></div></div>
+            <div class="post reply"><div class="avatar" aria-hidden="true">T</div><div><p class="post-name">tú</p><p class="post-text"><span class="mention bsky-handle"></span> reportar</p></div></div>
+          </div>
+          <h3>Cuenta del bot</h3>
+          <div class="copy-row"><code class="bsky-handle" id="bsky-handle"></code><button class="copy-btn" id="copy-handle" type="button">Copiar</button></div>
+          <p class="small">No necesitas instalar nada ni dar permisos. El bot solo lee los posts en los que lo mencionas y, si pides vigilancia, las respuestas a tu cuenta.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" aria-labelledby="sanciones-titulo">
+    <div class="wrap">
+      <div class="section-head">
+        <p class="eyebrow">En Discord</p>
+        <h2 id="sanciones-titulo">Sanciones progresivas</h2>
+        <p>Las alertas se cuentan por servidor. Solo suman las que el detector sanciona con confianza o las que confirma un administrador; un mensaje normal entre dos alertas reinicia la racha.</p>
+      </div>
+      <div class="ladder">
+        <div class="rung"><span class="eyebrow">Alertas 1 a 3</span><h3>Advertencia</h3><p>Se borra el mensaje, el infractor recibe un aviso privado y el administrador un reporte.</p></div>
+        <div class="rung hot"><span class="eyebrow">Alerta 4 o más</span><h3>Silencio de 1 hora</h3><p>Usa el silencio de Discord y se levanta solo al terminar la hora.</p></div>
+        <div class="rung max"><span class="eyebrow">4 alertas seguidas</span><h3>Bloqueo indefinido</h3><p>Solo un administrador lo quita, con <span class="cmd">/desbloquear</span>.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="band" id="privacidad" aria-labelledby="privacidad-titulo">
+    <div class="wrap two">
+      <div>
+        <div class="section-head"><p class="eyebrow">Privacidad</p><h2 id="privacidad-titulo">Qué ve cada quien</h2></div>
+        <ul class="facts">
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><p><strong>Solo los administradores</strong> ven las alertas, los comandos y el canal de moderación.</p></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18v12H8l-5 4z"/></svg><p><strong>El infractor</strong> recibe un aviso privado y no se le expone ante el resto, salvo que el administrador active los avisos públicos.</p></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v12c0 1.7 3.6 3 8 3s8-1.3 8-3V6"/></svg><p><strong>Se guarda poco:</strong> el número de alertas por usuario y el texto de los mensajes sancionados o enviados a revisión. Los mensajes normales se analizan y no se guardan.</p></li>
+          <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6l7-3z"/></svg><p><strong>Cada servidor es independiente:</strong> sus alertas y su configuración no se mezclan con las de otros.</p></li>
+        </ul>
+      </div>
+      <div>
+        <div class="section-head"><p class="eyebrow">Preguntas frecuentes</p><h2>Antes de instalarlo</h2></div>
+        <details><summary>¿Cuesta algo?</summary><p>No. Los bots de Discord y de Bluesky son gratuitos.</p></details>
+        <details><summary>¿Puede equivocarse?</summary><p>Sí. Por eso los casos dudosos los decide un administrador, y si el bot silencia a alguien por error, <span class="cmd">/desbloquear</span> lo revierte. Sabemos que aún le cuesta el odio contra grupos expresado sin groserías.</p></details>
+        <details><summary>¿Castiga una risa o una broma entre amigos?</summary><p>No. Un “jajaja” o “xD” solo nunca se considera ofensivo. El detector mira el mensaje completo: “jaja qué buen gol” pasa, un insulto acompañado de risa no.</p></details>
+        <details><summary>¿Cómo aprende?</summary><p>Cada vez que un administrador decide un caso dudoso, esa decisión se guarda. Al reentrenar, el modelo aprende de ellas. Solo se usa el feedback de servidores aprobados, para que nadie pueda sabotear el modelo compartido.</p></details>
+        <details><summary>¿En qué idioma funciona?</summary><p>En español, con énfasis en la forma de escribir en Colombia. Otros idiomas no se analizan bien.</p></details>
+        <details><summary>¿Cómo lo quito de mi servidor?</summary><p>Expúlsalo desde la lista de miembros o desde Ajustes del servidor → Integraciones. Deja de leer mensajes en ese momento.</p></details>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Sistema de Detección de Ciberacoso · NLP + RoBERTa</p>
+    <a href="https://github.com/jninop2-afk/Detector-de-ciberacoso-con-NLP" target="_blank" rel="noopener">Código en GitHub →</a>
+  </div>
+</footer>
+
+<script>
+// Cambia esto por la cuenta real del bot en Bluesky
+const BLUESKY_HANDLE = '';
+
+const $ = id => document.getElementById(id);
+const fmt = n => n.toFixed(2).replace('.', ',');
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------- Análisis en vivo (resultados reales del detector) ----------
+const EXAMPLES = [
+  { original: 'ese man es un s4p0 🤡', clean: 'ese man es un sapo emoji_cara_de_payaso', cat: 2, name: 'Insulto', conf: 0.93, engine: 'RoBERTuito', action: 'Sancionar' },
+  { original: 'jajajaja qué golazo parce 😂', clean: 'jaja que golazo parce emoji_cara_llorando_de_risa', cat: 0, name: 'Sin ciberacoso', conf: 0.97, engine: 'el modelo clásico', action: 'Permitir' },
+  { original: 'cuando te vea en la salida vas a ver', clean: 'cuando te vea en la salida vas a ver', cat: 1, name: 'Amenaza', conf: 0.93, engine: 'RoBERTuito', action: 'Sancionar' },
+  { original: 'tan bruta q ni pa eso sirve', clean: 'tan bruta que ni para eso sirve', cat: 2, name: 'Insulto', conf: 0.91, engine: 'RoBERTuito', action: 'Sancionar' },
+];
+const CAT_VARS = ['--cat0', '--cat1', '--cat2', '--cat3', '--cat4'];
+const dots = document.querySelector('.dots');
+let current = 0, timer = null;
+function show(i) {
+  current = i;
+  const e = EXAMPLES[i];
+  const color = `var(${CAT_VARS[e.cat]})`;
+  document.querySelector('.live').style.setProperty('--c', color);
+  $('live-num').textContent = e.cat;
+  $('live-msg').textContent = e.original;
+  $('live-clean').textContent = '→ ' + e.clean;
+  $('live-verdict').innerHTML = `<strong>${e.action} · ${e.name}</strong> con confianza ${fmt(e.conf)}. Decidió ${e.engine}.`;
+  for (const id of ['live-num', 'live-msg', 'live-clean', 'live-verdict']) { const n = $(id); n.classList.remove('fade'); void n.offsetWidth; n.classList.add('fade'); }
+  dots.querySelectorAll('button').forEach((b, j) => b.setAttribute('aria-current', j === i ? 'true' : 'false'));
+}
+EXAMPLES.forEach((_, i) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.setAttribute('aria-label', 'Ejemplo ' + (i + 1));
+  b.addEventListener('click', () => { show(i); restart(); });
+  dots.appendChild(b);
+});
+function restart() { clearInterval(timer); if (!reduced) timer = setInterval(() => show((current + 1) % EXAMPLES.length), 5000); }
+show(0); restart();
+
+// ---------- F1 por categoría ----------
+const F1 = [
+  { label: '0 · Sin ciberacoso', classic: null, roberta: 0.922 },
+  { label: '1 · Amenaza', classic: 0.903, roberta: 0.809 },
+  { label: '2 · Insulto', classic: 0.932, roberta: 0.878 },
+  { label: '3 · Odio y muerte', classic: 0.900, roberta: 0.735 },
+  { label: '4 · Calumnia', classic: 0.896, roberta: 0.791 },
+];
+const bar = (v, cls) => v == null
+  ? `<div class="bar"><span class="small">la etapa 2 no clasifica la categoría 0</span><span></span></div>`
+  : `<div class="bar"><div class="bar-track"><div class="bar-fill ${cls}" style="width:${v * 100}%"></div></div><span>${fmt(v)}</span></div>`;
+$('bars').innerHTML = F1.map(r => `<div class="bar-row"><span class="bar-label">${r.label}</span><div class="bar-pair">${bar(r.classic, 'classic')}${bar(r.roberta, 'roberta')}</div></div>`).join('');
+$('bars').style.cssText = 'display:flex;flex-direction:column;gap:16px';
+
+// ---------- Selector de plataforma ----------
+const tabs = document.querySelectorAll('[role="tab"]');
+function selectTab(name, scroll) {
+  tabs.forEach(t => {
+    const on = t.dataset.tab === name;
+    t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1;
+    $('panel-' + t.dataset.tab).hidden = !on;
+  });
+  if (scroll) $('usar').scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
+}
+tabs.forEach(t => {
+  t.addEventListener('click', () => { selectTab(t.dataset.tab); history.replaceState(null, '', '#' + t.dataset.tab); });
+  t.addEventListener('keydown', ev => {
+    if (ev.key !== 'ArrowRight' && ev.key !== 'ArrowLeft') return;
+    const other = [...tabs].find(x => x !== t); other.focus(); other.click();
+  });
+});
+document.querySelectorAll('[data-go]').forEach(a => a.addEventListener('click', ev => {
+  ev.preventDefault(); selectTab(a.dataset.go, true); history.replaceState(null, '', '#' + a.dataset.go);
+}));
+function fromHash() { const h = location.hash.slice(1); if (h === 'discord' || h === 'bluesky') selectTab(h, true); }
+window.addEventListener('hashchange', fromHash);
+fromHash();
+
+// ---------- Cuenta de Bluesky ----------
+const handle = BLUESKY_HANDLE ? '@' + BLUESKY_HANDLE.replace(/^@/, '') : '@[cuenta-del-bot].bsky.social';
+document.querySelectorAll('.bsky-handle').forEach(el => { el.textContent = handle; if (!BLUESKY_HANDLE) el.classList.add('placeholder'); });
+$('copy-handle').addEventListener('click', async ev => {
+  const btn = ev.currentTarget;
+  try { await navigator.clipboard.writeText(handle); btn.textContent = 'Copiado'; }
+  catch { const r = document.createRange(); r.selectNodeContents($('bsky-handle')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = 'Selecciónalo y cópialo'; }
+  setTimeout(() => { btn.textContent = 'Copiar'; }, 2000);
+});
+
+// ---------- Hélice de partículas: cada punto es un "mensaje"; los rojos/ámbar son acoso detectado ----------
+(() => {
+  const canvas = $('helix');
+  const ctx = canvas.getContext('2d');
+  let W = 0, H = 0, dpr = 1, running = false, raf = 0, last = 0, phase = 0;
+
+  // Sprites de brillo pre-renderizados (más barato que shadowBlur)
+  function sprite(r, g, b) {
+    const s = document.createElement('canvas'); s.width = s.height = 64;
+    const c = s.getContext('2d');
+    const grad = c.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, `rgba(${r},${g},${b},1)`);
+    grad.addColorStop(0.18, `rgba(${r},${g},${b},.85)`);
+    grad.addColorStop(0.45, `rgba(${r},${g},${b},.18)`);
+    grad.addColorStop(1, `rgba(${r},${g},${b},0)`);
+    c.fillStyle = grad; c.fillRect(0, 0, 64, 64);
+    return s;
+  }
+  const SPR = { green: sprite(60, 255, 126), pale: sprite(190, 255, 205), red: sprite(255, 110, 96), amber: sprite(255, 170, 80) };
+
+  // Partículas en coordenadas de la hélice: u (posición a lo largo), strand, offset
+  const parts = [];
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const TURNS = 2.3, N_STRAND = 2600, N_RUNG = 34, N_DUST = 240;
+  for (let i = 0; i < N_STRAND; i++) {
+    const u = rnd();
+    const flagged = rnd() < 0.02;
+    // Cada hebra es un "tubo" de polvo: desplazamiento aleatorio alrededor de la curva
+    const ta = rnd() * Math.PI * 2, tr = Math.sqrt(rnd()) * 0.2;
+    parts.push({ kind: 'strand', u, s: i % 2, tx: Math.cos(ta) * tr, tz: Math.sin(ta) * tr, tl: (rnd() - .5) * 0.05, size: 0.7 + rnd() * 1.2, spr: flagged ? (rnd() < .5 ? 'red' : 'amber') : (rnd() < .18 ? 'pale' : 'green'), big: flagged || rnd() < 0.015 });
+  }
+  for (let k = 0; k < N_RUNG; k++) {
+    const u = (k + .5) / N_RUNG;
+    for (let j = 0; j < 14; j++) parts.push({ kind: 'rung', u, t: (j + .5) / 14, jr: (rnd() - .5) * .06, size: 0.5 + rnd() * .5, spr: rnd() < .2 ? 'pale' : 'green', big: false });
+  }
+  for (let i = 0; i < N_DUST; i++) parts.push({ kind: 'dust', x: rnd(), y: rnd(), z: rnd(), size: 0.3 + rnd() * .7, spr: 'pale', tw: rnd() * 6.28 });
+
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = rect.width; H = rect.height;
+    canvas.width = Math.max(1, Math.round(W * dpr)); canvas.height = Math.max(1, Math.round(H * dpr));
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+    const L = Math.hypot(W, H) * 1.1;           // longitud de la hélice en pantalla
+    const R = Math.min(W, H) * 0.2;              // radio
+    const cx = W * 0.56, cy = H * 0.5;
+    const ang = -1.05;                           // inclinación: de abajo-izquierda a arriba-derecha
+    const ca = Math.cos(ang), sa = Math.sin(ang);
+    const persp = 900;
+    const scale = Math.max(0.7, Math.min(W, H) / 600);
+
+    const pts = [];
+    for (const p of parts) {
+      let x, y, z;
+      if (p.kind === 'dust') {
+        const tw = 0.45 + 0.55 * Math.sin(phase * 1.3 + p.tw);
+        pts.push({ X: p.x * W, Y: p.y * H, z: 1, a: 0.35 * tw, r: p.size * scale, spr: 'pale' });
+        continue;
+      }
+      let along = (p.u - .5) * L;
+      const theta = p.u * TURNS * Math.PI * 2 + phase;
+      if (p.kind === 'strand') {
+        const th = theta + p.s * Math.PI;
+        x = Math.cos(th) * R + p.tx * R; z = Math.sin(th) * R + p.tz * R;
+        along += p.tl * R;
+      } else {
+        const x1 = Math.cos(theta) * R, z1 = Math.sin(theta) * R;
+        const x2 = Math.cos(theta + Math.PI) * R, z2 = Math.sin(theta + Math.PI) * R;
+        x = x1 + (x2 - x1) * p.t; z = z1 + (z2 - z1) * p.t;
+        x *= 1 + p.jr;
+      }
+      // Rotación en el plano de pantalla (la hélice va a lo largo de "along")
+      const k = persp / (persp + z);
+      const X = cx + (along * ca - x * sa) * k;
+      const Y = cy + (along * sa + x * ca) * k;
+      const depth = (z / R + 1) / 2;             // 0 = delante, 1 = detrás
+      const fadeEnds = Math.min(1, Math.min(p.u, 1 - p.u) * 6);
+      const base = p.kind === 'rung' ? 0.55 : 1;
+      pts.push({ X, Y, z, a: (1 - depth * 0.65) * fadeEnds * base, r: (p.big ? 3.4 : p.size) * k * scale, spr: p.spr, big: p.big });
+    }
+    pts.sort((a, b) => b.z - a.z);
+    for (const q of pts) {
+      if (q.a <= 0.01) continue;
+      const s = q.r * (q.big ? 10 : 8);
+      ctx.globalAlpha = Math.min(1, q.a);
+      ctx.drawImage(SPR[q.spr], q.X - s / 2, q.Y - s / 2, s, s);
+    }
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function loop(t) {
+    if (!running) return;
+    const dt = Math.min(64, t - (last || t)); last = t;
+    phase += dt * 0.00022;
+    draw();
+    raf = requestAnimationFrame(loop);
+  }
+  function start() { if (running || reduced) return; running = true; last = 0; raf = requestAnimationFrame(loop); }
+  function stop() { running = false; cancelAnimationFrame(raf); }
+
+  resize(); draw();
+  new ResizeObserver(() => { resize(); draw(); }).observe(canvas);
+  const io = new IntersectionObserver(([e]) => { e.isIntersecting && !document.hidden ? start() : stop(); });
+  io.observe(canvas);
+  document.addEventListener('visibilitychange', () => { document.hidden ? stop() : start(); });
+})();
+</script>
+</body>
+</html>

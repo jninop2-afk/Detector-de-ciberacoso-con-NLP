@@ -16,7 +16,7 @@ import numpy as np
 
 from src import config
 from src.features import lexicon_signals
-from src.preprocessing import clean_text
+from src.preprocessing import clean_text, is_laughter_only
 
 log = logging.getLogger(__name__)
 
@@ -111,6 +111,10 @@ class CyberbullyingDetector:
     cleaned = clean_text(text)
     if not cleaned:
       return self._result(text, cleaned, {0: 1.0}, 'clasico', [], False)
+    # "jajaja", "xD jaja": en los datos la risa acompaña a muchos insultos,
+    # así que el modelo la aprendió como ofensiva. Sola nunca lo es.
+    if is_laughter_only(cleaned):
+      return self._result(text, cleaned, {0: 1.0}, 'regla_risa', [], False)
 
     classic = self._classic(text)
     signals = lexicon_signals(text)

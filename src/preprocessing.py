@@ -72,7 +72,17 @@ _URL_RE = re.compile(r'https?://\S+|www\.\S+')
 _MENTION_RE = re.compile(r'@\w+')
 _HASHTAG_RE = re.compile(r'#(\w+)')
 _ELONGATION_RE = re.compile(r'([^\W\d_])\1{2,}')
-_LAUGH_RE = re.compile(r'\b(?:j+[aeiou]+){2,}j*\b|\b(?:j+[sk]+){2,}\b|\b(?:ha){2,}h?\b')
+_LAUGH_RE = re.compile(
+    r'\ba?(?:j+[aeiou]+){2,}j*\b'   # jaja, jajjaja, ajajaja, jejeje, jajajaaj
+    r'|\b(?:j+[sk]+){2,}j*\b'       # jsjsjs, jkjk
+    r'|\ba?(?:h+a+){2,}h*\b'        # hahaha, ahaha
+)
+# Tokens sin carga ofensiva por sí solos (tras clean_text): un mensaje que
+# sólo contiene esto es risa o relleno, nunca ciberacoso
+LAUGH_ONLY_TOKENS = {
+    'jaja', 'ja', 'je', 'xd', 'xdd', 'lol', 'lmao', 'ok', 'okey', 'oki',
+    'emoji_cara_llorando_de_risa', 'emoji_cara_revolviendose_de_la_risa',
+}
 _RT_RE = re.compile(r'^rt\b')
 _NON_LETTER_RE = re.compile(r'[^a-zñü_\s]')
 _SPACES_RE = re.compile(r'\s+')
@@ -139,6 +149,12 @@ def clean_text(text: str) -> str:
   text = _NON_LETTER_RE.sub(' ', text)
   text = normalize_slang(_SPACES_RE.sub(' ', text).strip())
   return _SPACES_RE.sub(' ', text).strip()
+
+
+def is_laughter_only(cleaned: str) -> bool:
+  """True si el texto limpio es sólo risa/relleno ("jajaja", "xd jaja")."""
+  tokens = cleaned.split()
+  return bool(tokens) and all(t in LAUGH_ONLY_TOKENS for t in tokens)
 
 
 def preprocess_for_transformer(text: str) -> str:

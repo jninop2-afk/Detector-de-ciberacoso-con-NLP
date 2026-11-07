@@ -171,16 +171,29 @@ copias van a `BACKUP_DIR` (por defecto `backups/`) y se conservan las
 últimas `BACKUP_KEEP`. Para protegerse si se pierde la máquina, apunta
 `BACKUP_DIR` a una carpeta sincronizada fuera de ella.
 
-## Despliegue en un servidor (Oracle Cloud / Ubuntu)
+## Despliegue en un servidor (Hetzner Cloud / Ubuntu 24.04)
 
 Los bots sólo hacen conexiones salientes: no hace falta abrir puertos.
+Plan recomendado: 2 vCPU, 4 GB de RAM, 40 GB de disco.
 
 ```bash
+# 1. En el servidor recién creado, como root (una sola vez)
+curl -fsSLO https://raw.githubusercontent.com/jninop2-afk/Detector-de-ciberacoso-con-NLP/Main/deploy/prepare_server.sh
+bash prepare_server.sh                       # usuario cyberbot, swap, cortafuegos, SSH seguro
+
+# 2. Como cyberbot (ssh cyberbot@<IP>)
 git clone https://github.com/jninop2-afk/Detector-de-ciberacoso-con-NLP.git MPB
-cd MPB
-bash deploy/setup.sh                         # Python, entorno y dependencias
-# subir desde tu PC: models/, data/ y .env (no están en git)
-bash deploy/install_services.sh bot bluesky vigilancia
+cd MPB && bash deploy/setup.sh               # Python, entorno y dependencias
+```
+
+```powershell
+# 3. En tu PC (con el bot local detenido): modelos, base de datos y .env
+powershell -ExecutionPolicy Bypass -File deploy\subir_al_servidor.ps1 -Servidor <IP>
+```
+
+```bash
+# 4. En el servidor
+bash deploy/install_services.sh bot          # añade bluesky vigilancia si los usas
 ```
 
 Cada bot es un servicio systemd (`cyberbot@bot`, `cyberbot@bluesky`,

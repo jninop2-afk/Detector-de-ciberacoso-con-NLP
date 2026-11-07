@@ -269,16 +269,76 @@ def _others_with_access(channel: discord.TextChannel) -> list[str]:
   return others
 
 
-async def _make_private(channel: discord.TextChannel):
+class ConfigError(Exception):
+  """Error de /configurar con un mensaje listo para mostrar al admin."""
+
+
+def _forbidden_detail(err: discord.Forbidden) -> str:
+  return f'Discord respondió: {err.text or "Forbidden"} (código {err.code}).'
+
+
+def _check_channel_usable(channel: discord.TextChannel):
+  """Comprueba, antes de tocar nada, que el bot puede convertir el canal en privado."""
   guild = channel.guild
-  await channel.set_permissions(guild.default_role, view_channel=False)
-  await channel.set_permissions(
-      guild.me, view_channel=True, send_messages=True, embed_links=True,
-      read_message_history=True,
-  )
+  special = {guild.system_channel, guild.rules_channel, guild.public_updates_channel} - {None}
+  if channel in special:
+    raise ConfigError(
+        f'{channel.mention} es un canal principal del servidor (bienvenidas, reglas o '
+        'avisos) y no lo voy a ocultar a los miembros. Ejecuta `/configurar` sin `canal` '
+        'para que cree uno privado, o elige otro canal.'
+    )
+  perms = channel.permissions_for(guild.me)
+  if not perms.view_channel:
+    raise ConfigError(
+        f'No puedo ver {channel.mention}. Agrégame a ese canal (Editar canal → Permisos) '
+        'o ejecuta `/configurar` sin `canal` para que cree uno privado.'
+    )
+  if not perms.manage_roles:
+    raise ConfigError(
+        f'No puedo editar los permisos de {channel.mention}: el canal o su categoría me '
+        'quitan **Gestionar permisos**. Dámelo en ese canal o ejecuta `/configurar` sin `canal`.'
+    )
+
+
+async def _make_private(channel: discord.TextChannel):
+  """Oculta el canal a @everyone sin que el bot pierda el acceso.
+
+  El orden importa: si primero se oculta a @everyone, el bot (que suele ver el
+  canal gracias a @everyone) deja de verlo y ya no puede darse acceso.
+  """
+  guild = channel.guild
+  _check_channel_usable(channel)
+  previous_everyone = channel.overwrites_for(guild.default_role)
+  previous_me = channel.overwrites.get(guild.me)
+  try:
+    await channel.set_permissions(
+        guild.me, view_channel=True, send_messages=True, embed_links=True,
+        read_message_history=True, reason='Canal privado de moderación del bot',
+    )
+    await channel.set_permissions(
+        guild.default_role, view_channel=False, reason='Canal privado de moderación del bot',
+    )
+  except discord.Forbidden as err:
+    # Deshace lo que alcanzó a cambiar para no dejar el canal a medias
+    try:
+      await channel.set_permissions(guild.default_role, overwrite=previous_everyone)
+      await channel.set_permissions(guild.me, overwrite=previous_me)
+    except discord.HTTPException:
+      log.warning('No se pudieron restaurar los permisos de #%s', channel)
+    raise ConfigError(
+        f'No pude cambiar los permisos de {channel.mention}. {_forbidden_detail(err)}'
+    ) from err
 
 
 async def _create_private_channel(guild: discord.Guild) -> discord.TextChannel:
+  missing = [name for perm, name in (('manage_channels', 'Gestionar canales'),
+                                     ('manage_roles', 'Gestionar roles'))
+             if not getattr(guild.me.guild_permissions, perm)]
+  if missing:
+    raise ConfigError(
+        f'Para crear el canal privado me falta: **{", ".join(missing)}**. '
+        'Actívalo en Ajustes del servidor → Roles → mi rol, o vuelve a invitarme con el enlace.'
+    )
   overwrites = {
       guild.default_role: discord.PermissionOverwrite(view_channel=False),
       guild.me: discord.PermissionOverwrite(
@@ -310,6 +370,7 @@ async def configurar(
   cfg = db.get_guild_config(guild.id)
   current = guild.get_channel(cfg['mod_channel_id']) if cfg and cfg['mod_channel_id'] else None
 
+  was_public = canal is not None and canal.permissions_for(guild.default_role).view_channel
   try:
     if canal is not None:
       await _make_private(canal)
@@ -318,10 +379,13 @@ async def configurar(
       channel = await _create_private_channel(guild)
     else:
       channel = current
-  except discord.Forbidden:
+  except ConfigError as err:
+    await interaction.followup.send(str(err), ephemeral=True)
+    return
+  except discord.Forbidden as err:
+    log.warning('/configurar en %s (%s): %s', guild.name, guild.id, err)
     await interaction.followup.send(
-        'No tengo permisos para crear o editar el canal. Dame **Gestionar canales** '
-        'y **Gestionar roles** e inténtalo de nuevo.', ephemeral=True,
+        f'No pude crear el canal privado. {_forbidden_detail(err)}', ephemeral=True,
     )
     return
 
@@ -332,6 +396,7 @@ async def configurar(
   lines = [
       '**Bot de moderación activo en este servidor.**',
       f'• Canal privado de moderación: {channel.mention}',
+      *(['• Ese canal era público: ahora solo lo ven los administradores.'] if was_public else []),
       f'• Avisos públicos de sanción: **{"sí" if cfg["public_notices"] else "no"}**'
       ' (el infractor siempre recibe un MD)',
   ]
