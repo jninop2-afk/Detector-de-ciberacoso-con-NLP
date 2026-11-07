@@ -64,7 +64,7 @@ def construir_respuesta(r: dict) -> str:
 def _reportar_post(client: Client, uri: str, cid: str, r: dict) -> None:
   client.com.atproto.moderation.create_report(
       models.ComAtprotoModerationCreateReport.Data(
-          reason_type=models.ComAtprotoModerationDefs.ReasonRude,
+          reason_type='com.atproto.moderation.defs#reasonRude',
           reason=(
               'Detección automática (proyecto universitario): '
               f'{r["categoria_nombre"]} ({r["confianza"] * 100:.0f}% de confianza)'
